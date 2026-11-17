@@ -6,12 +6,13 @@ Android music-player prototype focused on a modern VK-oriented listening experie
 - Kotlin + Jetpack Compose + Material 3
 - AndroidX Media3 ExoPlayer + MediaSessionService
 - Dual-player equal-power crossfade engine
+- Preferences DataStore for local playback settings
 - GitHub Actions build and unit-test pipeline
 
 ## Build
 Open the project in Android Studio, sync Gradle and run the `app` configuration.
 
-CI can build the debug APK and run local unit tests with:
+CI builds the debug APK and runs local unit tests with:
 
 ```bash
 gradle --no-daemon testDebugUnitTest assembleDebug
@@ -19,23 +20,26 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 
 ## Current implementation
 - Adaptive dark UI scaffold for compact phones and wide screens
-- Crossfade duration control from 2 to 15 seconds, default 7 seconds
-- Equal-power cosine/sine gain curves
-- Incoming track pre-buffering on the secondary ExoPlayer
-- Transition duration is clamped to the remaining outgoing-track duration
-- Unit tests cover gain curves and transition timing boundaries
-- MediaSessionService foundation with Android media-session integration
-- Demo track list remains UI-only; no audio is bundled
-- The UI is not yet connected to the playback service or crossfade engine
-- VK authentication, catalog access and authorized audio-source resolution are not implemented
+- Activity connects to the foreground service through a lifecycle-managed MediaController
+- Two ExoPlayer decks are owned by the playback service
+- MediaSession follows the active deck through two stable player adapters
+- Audio focus is coordinated by the service, avoiding competing focus requests during overlap
+- Headphone-unplug handling is enabled on both decks
+- Equal-power cosine/sine crossfade curves with configurable 2–15 second duration (default 7)
+- Incoming track pre-buffering and a gapless fallback when the next source is late
+- Queue set/add/move/replace/remove operations are routed through the crossfade engine
+- Repeat off/all/one behavior and previous/next command availability
+- Queue replacement preserves the current playback position and playing state where possible
+- Crossfade duration is persisted locally with Preferences DataStore
+- Unit tests cover crossfade gain curves, timing boundaries and provider-neutral queue behavior
+- Provider-neutral track model keeps authorized stream resolution separate from playback
 
-## Next engineering milestones
-1. Connect the foreground service, media session and UI through MediaController.
-2. Integrate the dual-player crossfade engine with the service without breaking system media controls.
-3. Add deterministic tests for queue changes, pause/resume, failed sources and interruptions.
-4. Verify the currently supported VK authentication and audio-catalog access paths before implementing account integration.
-5. Add persistence for queue, favorites, playlists and playback settings.
+## Not implemented yet
+- VK authentication and account linking
+- VK catalog search and authorized stream URL resolution
+- Real VK track artwork/catalog data in the UI
+- Runtime playback verification on a physical Android device
 
-VK credentials are not required for the current foundation work. No API secrets belong in this public repository.
+The UI currently has no bundled demo audio. Playback controls become active when a playable MediaItem is supplied. VK credentials are not required for the current foundation work. No API secrets belong in this public repository.
 
 Application ID: `com.vkwave.app`
