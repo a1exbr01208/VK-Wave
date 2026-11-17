@@ -1,6 +1,12 @@
 package com.vkwave.app
 
 import android.os.Bundle
+import android.content.ComponentName
+import androidx.media3.common.Player
+import androidx.media3.session.MediaController
+import androidx.media3.session.SessionToken
+import java.util.concurrent.Future
+import java.util.concurrent.Executor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -36,24 +42,67 @@ private val waveTabs = listOf(
 )
 
 class MainActivity : ComponentActivity() {
+    private val mediaControllerState = mutableStateOf<MediaController?>(null)
+    private var controllerFuture: Future<MediaController>? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { VKWaveApp() }
+        setContent { VKWaveApp(mediaControllerState.value) }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val token = SessionToken(this, ComponentName(this, WavePlaybackService::class.java))
+        val future = MediaController.Builder(this, token).buildAsync()
+        controllerFuture = future
+        future.addListener({
+            if (controllerFuture === future) {
+                try {
+                    mediaControllerState.value = future.get()
+                } catch (_: Exception) {
+                    mediaControllerState.value = null
+                }
+            }
+        }, Executor { command -> runOnUiThread(command) })
+    }
+
+    override fun onStop() {
+        mediaControllerState.value = null
+        controllerFuture?.let { MediaController.releaseFuture(it) }
+        controllerFuture = null
+        super.onStop()
     }
 }
 
 @Composable
-fun VKWaveApp() {
+fun VKWaveApp(controller: MediaController?) {
     var tab by remember { mutableStateOf("Главная") }
     var crossfade by remember { mutableFloatStateOf(7f) }
-    var playing by remember { mutableStateOf(false) }
-    var selected by remember { mutableIntStateOf(0) }
-    val tracks = listOf(
-        "Midnight City" to "M83",
-        "After Dark" to "Mr.Kitty",
-        "Resonance" to "HOME",
-        "The Perfect Girl" to "Mareux"
-    )
+    var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
+    var hasMedia by remember(controller) { mutableStateOf((controller?.mediaItemCount ?: 0) > 0) }
+
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                playing = isPlaying
+            }
+
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                hasMedia = (controller?.mediaItemCount ?: 0) > 0
+            }
+
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                hasMedia = mediaItem != null
+            }
+        }
+        controller?.addListener(listener)
+        onDispose { controller?.removeListener(listener) }
+    }
+
+    val currentTitle = controller?.currentMediaItem?.mediaMetadata?.title?.toString()
+        ?.takeIf { it.isNotBlank() } ?: "VK Wave готов к воспроизведению"
+    val currentArtist = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
+        ?.takeIf { it.isNotBlank() } ?: "Источник аудио пока не подключён"
 
     MaterialTheme(colorScheme = darkColorScheme(
         background = Ink, surface = Panel, primary = Accent,
@@ -65,10 +114,10 @@ fun VKWaveApp() {
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
                     PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                        tracks[selected], playing,
-                        { playing = !playing },
-                        { selected = (selected - 1 + tracks.size) % tracks.size },
-                        { selected = (selected + 1) % tracks.size }
+                        currentTitle to currentArtist, playing, hasMedia,
+                        { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                        { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
+                        { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
                     )
                     CrossfadeCard(crossfade, { crossfade = it }, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
@@ -109,10 +158,10 @@ fun VKWaveApp() {
                         WaveHeader(tab)
                         Spacer(Modifier.height(20.dp))
                         PlayerCard(
-                            Modifier.weight(1f).fillMaxWidth(), tracks[selected], playing,
-                            { playing = !playing },
-                            { selected = (selected - 1 + tracks.size) % tracks.size },
-                            { selected = (selected + 1) % tracks.size }
+                            Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
+                            { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                            { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
+                            { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
                         )
                         CrossfadeCard(crossfade, { crossfade = it }, Modifier.padding(top = 16.dp))
                     }
@@ -158,6 +207,7 @@ private fun PlayerCard(
     modifier: Modifier,
     track: Pair<String, String>,
     playing: Boolean,
+    hasMedia: Boolean,
     onPlay: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit
@@ -185,22 +235,22 @@ private fun PlayerCard(
             Text(track.second, color = Muted, fontSize = 15.sp)
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = Color.White)
+                IconButton(onClick = onPrevious, enabled = hasMedia) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (hasMedia) Color.White else Muted)
                 }
-                FilledIconButton(onClick = onPlay,
+                FilledIconButton(onClick = onPlay, enabled = hasMedia,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent),
                     modifier = Modifier.size(58.dp)) {
                     Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
                         contentDescription = if (playing) "Пауза демо" else "Запуск демо",
                         modifier = Modifier.size(30.dp))
                 }
-                IconButton(onClick = onNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = Color.White)
+                IconButton(onClick = onNext, enabled = hasMedia) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (hasMedia) Color.White else Muted)
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("ДЕМО · ВОСПРОИЗВЕДЕНИЕ ПОКА НЕ ПОДКЛЮЧЕНО",
+            Text(if (hasMedia) "УПРАВЛЕНИЕ ЧЕРЕЗ ANDROID MEDIA SESSION" else "НЕТ ДОСТУПНОГО ИСТОЧНИКА АУДИО",
                 color = Color.White.copy(alpha = .6f), fontSize = 9.sp, letterSpacing = 1.sp)
         }
     }
