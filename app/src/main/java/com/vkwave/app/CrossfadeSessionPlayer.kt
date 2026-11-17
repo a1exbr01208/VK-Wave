@@ -24,7 +24,6 @@ class CrossfadeSessionPlayer(
     override fun getState(): State {
         val state = super.getState()
         val commands = state.availableCommands.buildUpon()
-            .remove(Player.COMMAND_CHANGE_MEDIA_ITEMS)
             .remove(Player.COMMAND_SET_SHUFFLE_MODE)
             .remove(Player.COMMAND_SET_AUDIO_ATTRIBUTES)
 
@@ -62,6 +61,40 @@ class CrossfadeSessionPlayer(
         startPositionMs: Long
     ): ListenableFuture<*> {
         engine.setQueue(mediaItems, startIndex, startPositionMs)
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleAddMediaItems(
+        index: Int,
+        mediaItems: List<MediaItem>
+    ): ListenableFuture<*> {
+        engine.addMediaItems(index, mediaItems)
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleMoveMediaItems(
+        fromIndex: Int,
+        toIndex: Int,
+        newIndex: Int
+    ): ListenableFuture<*> {
+        engine.moveMediaItems(fromIndex, toIndex, newIndex)
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleReplaceMediaItems(
+        fromIndex: Int,
+        toIndex: Int,
+        mediaItems: List<MediaItem>
+    ): ListenableFuture<*> {
+        engine.replaceMediaItems(fromIndex, toIndex, mediaItems)
+        return Futures.immediateVoidFuture()
+    }
+
+    override fun handleRemoveMediaItems(
+        fromIndex: Int,
+        toIndex: Int
+    ): ListenableFuture<*> {
+        engine.removeMediaItems(fromIndex, toIndex)
         return Futures.immediateVoidFuture()
     }
 
