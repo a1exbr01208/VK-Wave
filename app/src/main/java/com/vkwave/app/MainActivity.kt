@@ -17,6 +17,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -50,6 +52,7 @@ private val waveTabs = listOf(
 class MainActivity : ComponentActivity() {
     private val mediaControllerState = mutableStateOf<MediaController?>(null)
     private val crossfadeState = mutableFloatStateOf(7f)
+    private val musicSources by lazy { createMusicSourceRegistry(applicationContext) }
     private var controllerFuture: Future<MediaController>? = null
     private var saveCrossfadeJob: Job? = null
 
@@ -65,7 +68,9 @@ class MainActivity : ComponentActivity() {
                 mediaControllerState.value,
                 crossfadeState.floatValue,
                 ::updateCrossfade,
-                ::startDemoPlayback
+                ::startDemoPlayback,
+                musicSources,
+                ::playSourceTracks
             )
         }
     }
@@ -78,6 +83,21 @@ class MainActivity : ComponentActivity() {
             controller.setMediaItems(items, 0, 0L)
             controller.prepare()
             controller.play()
+        }
+    }
+
+    private fun playSourceTracks(tracks: List<WaveTrack>, startIndex: Int) {
+        val controller = mediaControllerState.value ?: return
+        lifecycleScope.launch {
+            val items = tracks.mapNotNull { track ->
+                val source = musicSources.get(track.sourceId) ?: return@mapNotNull null
+                runCatching { track to source.resolvePlayback(track) }.getOrNull()
+            }.map { (track, uri) -> track.toMediaItem(uri) }
+            if (items.isNotEmpty() && mediaControllerState.value === controller) {
+                controller.setMediaItems(items, startIndex.coerceIn(items.indices), 0L)
+                controller.prepare()
+                controller.play()
+            }
         }
     }
 
@@ -119,7 +139,9 @@ fun VKWaveApp(
     controller: MediaController?,
     crossfade: Float,
     onCrossfadeChange: (Float) -> Unit,
-    onDemoPlayback: () -> Unit
+    onDemoPlayback: () -> Unit,
+    sourceRegistry: MusicSourceRegistry,
+    onPlaySourceTracks: (List<WaveTrack>, Int) -> Unit
 ) {
     var tab by remember { mutableStateOf("Главная") }
     var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
@@ -182,7 +204,13 @@ fun VKWaveApp(
             if (maxWidth < 600.dp) {
                 Column(Modifier.fillMaxSize()) {
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
-                    PlayerCard(
+                    if (tab == "Поиск") {
+                        SourceSearchScreen(
+                            sourceRegistry,
+                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                            onPlaySourceTracks
+                        )
+                    } else PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                         currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                         { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
@@ -229,7 +257,13 @@ fun VKWaveApp(
                     Column(Modifier.fillMaxSize().padding(end = 24.dp, top = 24.dp, bottom = 20.dp)) {
                         WaveHeader(tab)
                         Spacer(Modifier.height(20.dp))
-                        PlayerCard(
+                        if (tab == "Поиск") {
+                            SourceSearchScreen(
+                                sourceRegistry,
+                                Modifier.weight(1f).fillMaxWidth(),
+                                onPlaySourceTracks
+                            )
+                        } else PlayerCard(
                             Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
                             canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                             { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
@@ -240,6 +274,72 @@ fun VKWaveApp(
                         )
                         CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceSearchScreen(
+    sourceRegistry: MusicSourceRegistry,
+    modifier: Modifier = Modifier,
+    onPlayTracks: (List<WaveTrack>, Int) -> Unit
+) {
+    val source = remember(sourceRegistry) { sourceRegistry.get(AudiusMusicSource.SOURCE_ID) }
+    var query by remember { mutableStateOf("") }
+    var tracks by remember { mutableStateOf(emptyList<WaveTrack>()) }
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("Ищи независимых исполнителей и треки в каталоге Audius") }
+    val scope = rememberCoroutineScope()
+
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Источник: Audius · открытый музыкальный каталог", color = Muted, fontSize = 12.sp)
+        OutlinedTextField(
+            value = query,
+            onValueChange = { query = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Трек или исполнитель") },
+            singleLine = true
+        )
+        Button(
+            onClick = {
+                val provider = source
+                if (provider != null && query.isNotBlank()) {
+                    scope.launch {
+                        loading = true
+                        message = "Ищем треки…"
+                        try {
+                            tracks = provider.search(query).tracks
+                            message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: \${tracks.size}"
+                        } catch (error: Exception) {
+                            message = error.message ?: "Не удалось связаться с Audius"
+                            tracks = emptyList()
+                        } finally {
+                            loading = false
+                        }
+                    }
+                }
+            },
+            enabled = !loading && query.isNotBlank() && source != null
+        ) {
+            Text(if (loading) "Поиск…" else "Найти")
+        }
+        Text(message, color = Muted, fontSize = 12.sp)
+        tracks.forEachIndexed { index, track ->
+            Surface(
+                color = Panel,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(tracks, index) }
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(track.artist, color = Muted, fontSize = 12.sp)
+                    Text("▶  Слушать", color = Accent, fontSize = 11.sp)
                 }
             }
         }
