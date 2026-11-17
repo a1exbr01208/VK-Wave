@@ -20,6 +20,8 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 
 ## Current implementation
 - Adaptive dark UI scaffold for compact phones and wide screens
+- Live playback progress, elapsed/duration display and seeking
+- On-demand synthetic two-tone test queue to exercise playback and crossfade without VK credentials
 - Activity connects to the foreground service through a lifecycle-managed MediaController
 - Two ExoPlayer decks are owned by the playback service
 - MediaSession follows the active deck through two stable player adapters
@@ -39,7 +41,14 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - VK catalog search and authorized stream URL resolution
 - Real VK track artwork/catalog data in the UI
 - Runtime playback verification on a physical Android device
+- VK authentication and catalog integration remain blocked pending a supported VK audio-access route
 
-The UI currently has no bundled demo audio. Playback controls become active when a playable MediaItem is supplied. VK credentials are not required for the current foundation work. No API secrets belong in this public repository.
+The app generates two short synthetic WAV tones in its cache when the **Тест движка** action is used; no copyrighted sample music is bundled. This test queue exercises MediaSession, queue commands, seeking, progress and crossfade.
+
+## VK integration gate
+
+VK's public audio API for third-party applications was disabled in 2016, while the official VK ID SDK provides OAuth authentication rather than a guarantee of music-catalog access. Before implementing real VK music, the project needs a supported access path from VK (for example, approved partner/official-client access). The project will not rely on undocumented private endpoints, stolen tokens or official-app impersonation.
+
+VK credentials are not required for the current playback foundation. If a supported VK ID integration is approved, app configuration can be added at that stage. No client secrets or access tokens belong in this public repository.
 
 Application ID: `com.vkwave.app`
