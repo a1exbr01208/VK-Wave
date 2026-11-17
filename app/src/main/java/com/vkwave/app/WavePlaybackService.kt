@@ -3,6 +3,7 @@ package com.vkwave.app
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioAttributes as PlatformAudioAttributes
+import androidx.media3.common.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
@@ -11,6 +12,7 @@ import androidx.media3.session.MediaSessionService
  * lifecycle. Audio focus is centralized so overlapping ExoPlayers never
  * compete with each other for focus during a crossfade.
  */
+@OptIn(UnstableApi::class)
 class WavePlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var crossfadeEngine: CrossfadeEngine? = null
