@@ -322,7 +322,7 @@ class CrossfadeEngine(context: Context) {
                             delay(50)
                         }
                         if (!isActive || released) return@launch
-                        if (outgoing.playbackState == Player.STATE_ENDED) {
+                        if (outgoing.playbackState == Player.STATE_ENDED || outgoing.playerError != null) {
                             outgoingGain = 0f
                             incomingGain = 1f
                             applyVolumes()
