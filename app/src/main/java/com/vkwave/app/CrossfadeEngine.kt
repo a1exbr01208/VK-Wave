@@ -68,6 +68,9 @@ class CrossfadeEngine(context: Context) {
     val activePlayer: ExoPlayer
         get() = players[active]
 
+    val deckPlayers: List<ExoPlayer>
+        get() = players.toList()
+
     val isPlaying: Boolean
         get() = !released && activePlayer.isPlaying
 
