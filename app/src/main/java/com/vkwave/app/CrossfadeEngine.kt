@@ -71,6 +71,12 @@ class CrossfadeEngine(context: Context) {
     val deckPlayers: List<ExoPlayer>
         get() = players.toList()
 
+    val queueItems: List<MediaItem>
+        get() = playlist
+
+    val currentQueueIndex: Int
+        get() = index
+
     val isPlaying: Boolean
         get() = !released && activePlayer.isPlaying
 
@@ -82,6 +88,7 @@ class CrossfadeEngine(context: Context) {
 
     fun setQueue(items: List<MediaItem>, startIndex: Int = 0, startPositionMs: Long = 0L) {
         if (released) return
+        val wasPlaying = activePlayer.playWhenReady
         queueGeneration += 1
         transitionJob?.cancel()
         transitionJob = null
@@ -103,8 +110,63 @@ class CrossfadeEngine(context: Context) {
         activePlayer.setMediaItem(playlist[index], startPositionMs.coerceAtLeast(0L))
         activePlayer.prepare()
         applyRepeatMode(activePlayer)
+        if (wasPlaying) activePlayer.play()
         prepareUpcoming()
         startMonitor()
+    }
+
+    fun addMediaItems(insertIndex: Int, items: List<MediaItem>) {
+        if (released || items.isEmpty()) return
+        val insertion = insertIndex.coerceIn(0..playlist.size)
+        val updated = playlist.toMutableList().apply { addAll(insertion, items) }
+        val newIndex = if (playlist.isEmpty()) 0
+            else if (index >= insertion) index + items.size else index
+        setQueue(updated, newIndex, activePlayer.currentPosition)
+    }
+
+    fun moveMediaItems(fromIndex: Int, toIndex: Int, newIndex: Int) {
+        if (released || fromIndex < 0 || toIndex > playlist.size ||
+            fromIndex >= toIndex
+        ) return
+        val count = toIndex - fromIndex
+        val updated = playlist.toMutableList()
+        val moved = updated.subList(fromIndex, toIndex).toList()
+        repeat(count) { updated.removeAt(fromIndex) }
+        val destination = newIndex.coerceIn(0..updated.size)
+        updated.addAll(destination, moved)
+
+        val newCurrentIndex = if (index in fromIndex until toIndex) {
+            destination + (index - fromIndex)
+        } else {
+            val afterRemoval = if (index >= toIndex) index - count else index
+            if (afterRemoval >= destination) afterRemoval + count else afterRemoval
+        }
+        setQueue(updated, newCurrentIndex, activePlayer.currentPosition)
+    }
+
+    fun replaceMediaItems(fromIndex: Int, toIndex: Int, items: List<MediaItem>) {
+        if (released || fromIndex < 0 || toIndex > playlist.size ||
+            fromIndex > toIndex
+        ) return
+        val currentWasReplaced = index in fromIndex until toIndex
+        val updated = playlist.toMutableList()
+        repeat(toIndex - fromIndex) { updated.removeAt(fromIndex) }
+        updated.addAll(fromIndex, items)
+
+        val newIndex = when {
+            updated.isEmpty() -> 0
+            currentWasReplaced && items.isNotEmpty() ->
+                fromIndex + (index - fromIndex).coerceAtMost(items.lastIndex)
+            currentWasReplaced -> fromIndex.coerceAtMost(updated.lastIndex)
+            index >= toIndex -> index + items.size - (toIndex - fromIndex)
+            else -> index
+        }
+        val position = if (currentWasReplaced) 0L else activePlayer.currentPosition
+        setQueue(updated, newIndex, position)
+    }
+
+    fun removeMediaItems(fromIndex: Int, toIndex: Int) {
+        replaceMediaItems(fromIndex, toIndex, emptyList())
     }
 
     fun play() {
@@ -143,7 +205,7 @@ class CrossfadeEngine(context: Context) {
         repeatMode = mode
         players.forEach(::applyRepeatMode)
         failedNextIndex = null
-        prepareUpcoming()
+        if (transitionJob?.isActive != true) prepareUpcoming()
     }
 
     fun skipToNext(): Boolean {
