@@ -222,7 +222,7 @@ class CrossfadeEngine(context: Context) {
                 val duration = outgoing.duration
                 val nextIndex = nextIndexForAutomaticTransition()
                 if (nextIndex != null && transitionJob == null) {
-                    if (outgoing.playbackState == Player.STATE_ENDED) {
+                    if (outgoing.playbackState == Player.STATE_ENDED || outgoing.playerError != null) {
                         startGaplessFallback(nextIndex)
                     } else if (outgoing.isPlaying && duration > 0 &&
                         failedNextIndex != nextIndex
@@ -309,7 +309,7 @@ class CrossfadeEngine(context: Context) {
                 val steps = (durationMs / 40L).coerceAtLeast(1L).toInt()
                 for (step in 0 until steps) {
                     if (!outgoing.isPlaying) {
-                        if (outgoing.playbackState == Player.STATE_ENDED) {
+                        if (outgoing.playbackState == Player.STATE_ENDED || outgoing.playerError != null) {
                             outgoingGain = 0f
                             incomingGain = 1f
                             applyVolumes()
@@ -317,7 +317,7 @@ class CrossfadeEngine(context: Context) {
                         }
                         incoming.pause()
                         while (isActive && !outgoing.isPlaying &&
-                            outgoing.playbackState != Player.STATE_ENDED && !released
+                            outgoing.playbackState != Player.STATE_ENDED && outgoing.playerError == null && !released
                         ) {
                             delay(50)
                         }
