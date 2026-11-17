@@ -200,9 +200,10 @@ fun VKWaveApp(
                         Spacer(Modifier.height(20.dp))
                         PlayerCard(
                             Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
+                            canSkipPrevious, canSkipNext,
                             { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
-                            { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
-                            { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } }
                         )
                         CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
