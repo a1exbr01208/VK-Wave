@@ -16,7 +16,7 @@ import androidx.media3.session.MediaSessionService
 class WavePlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var crossfadeEngine: CrossfadeEngine? = null
-    private var sessionPlayer: CrossfadeSessionPlayer? = null
+    private var sessionPlayers: List<CrossfadeSessionPlayer> = emptyList()
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var resumeOnFocusGain = false
@@ -51,16 +51,24 @@ class WavePlaybackService : MediaSessionService() {
         val engine = CrossfadeEngine(this)
         crossfadeEngine = engine
 
-        val player = CrossfadeSessionPlayer(
-            initialPlayer = engine.activePlayer,
-            engine = engine,
-            requestAudioFocus = ::requestAudioFocus,
-            abandonAudioFocus = ::abandonAudioFocus
-        )
-        sessionPlayer = player
-        engine.onActivePlayerChanged = player::switchTo
+        val decks = engine.deckPlayers
+        val adapters = decks.map { deck ->
+            CrossfadeSessionPlayer(
+                initialPlayer = deck,
+                engine = engine,
+                requestAudioFocus = ::requestAudioFocus,
+                abandonAudioFocus = ::abandonAudioFocus
+            )
+        }
+        sessionPlayers = adapters
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, adapters.first()).build()
+        engine.onActivePlayerChanged = { activeDeck ->
+            val activeIndex = decks.indexOfFirst { it === activeDeck }
+            if (activeIndex >= 0) {
+                mediaSession?.setPlayer(adapters[activeIndex])
+            }
+        }
     }
 
     private fun requestAudioFocus(): Boolean {
@@ -102,7 +110,7 @@ class WavePlaybackService : MediaSessionService() {
         abandonAudioFocus()
         mediaSession?.release()
         mediaSession = null
-        sessionPlayer = null
+        sessionPlayers = emptyList()
         crossfadeEngine?.release()
         crossfadeEngine = null
         audioManager = null
