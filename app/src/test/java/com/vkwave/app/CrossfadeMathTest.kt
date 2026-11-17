@@ -29,4 +29,17 @@ class CrossfadeMathTest {
         assertEquals(1f, CrossfadeMath.outgoingGain(-1f), 0.0001f)
         assertEquals(1f, CrossfadeMath.incomingGain(2f), 0.0001f)
     }
+
+    @Test
+    fun lateFadeNeverExceedsRemainingTrackTime() {
+        assertEquals(2_300L, CrossfadeMath.actualFadeDurationMs(2_300L, 7))
+        assertEquals(7_000L, CrossfadeMath.actualFadeDurationMs(9_000L, 7))
+    }
+
+    @Test
+    fun fadeDurationRespectsSupportedBounds() {
+        assertEquals(2_000L, CrossfadeMath.actualFadeDurationMs(9_000L, 1))
+        assertEquals(15_000L, CrossfadeMath.actualFadeDurationMs(20_000L, 20))
+        assertEquals(1L, CrossfadeMath.actualFadeDurationMs(0L, 7))
+    }
 }
