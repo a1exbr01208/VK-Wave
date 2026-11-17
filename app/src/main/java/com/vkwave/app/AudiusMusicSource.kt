@@ -29,7 +29,7 @@ class AudiusMusicSource(
         capabilities = SourceCapabilities(
             search = true,
             library = false,
-            playlists = true,
+            playlists = false,
             authentication = false,
             offlinePlayback = false
         )
