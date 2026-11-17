@@ -15,10 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.PI
-import kotlin.math.cos
 import kotlin.math.min
-import kotlin.math.sin
 
 /**
  * Two-player equal-power crossfade engine.
@@ -135,8 +132,8 @@ class CrossfadeEngine(context: Context) {
                     }
 
                     val progress = (step + 1f) / steps
-                    outgoing.volume = cos(progress * PI / 2.0).toFloat()
-                    incoming.volume = sin(progress * PI / 2.0).toFloat()
+                    outgoing.volume = CrossfadeMath.outgoingGain(progress)
+                    incoming.volume = CrossfadeMath.incomingGain(progress)
                     delay(40)
                 }
 
