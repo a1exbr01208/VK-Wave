@@ -110,6 +110,12 @@ fun VKWaveApp(
     var tab by remember { mutableStateOf("Главная") }
     var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
     var hasMedia by remember(controller) { mutableStateOf((controller?.mediaItemCount ?: 0) > 0) }
+    var canSkipPrevious by remember(controller) {
+        mutableStateOf(controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM) == true)
+    }
+    var canSkipNext by remember(controller) {
+        mutableStateOf(controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM) == true)
+    }
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
@@ -123,6 +129,11 @@ fun VKWaveApp(
 
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 hasMedia = mediaItem != null
+            }
+
+            override fun onAvailableCommandsChanged(availableCommands: Player.Commands) {
+                canSkipPrevious = availableCommands.contains(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                canSkipNext = availableCommands.contains(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
             }
         }
         controller?.addListener(listener)
@@ -144,10 +155,10 @@ fun VKWaveApp(
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
                     PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                        currentTitle to currentArtist, playing, hasMedia,
+                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
                         { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
-                        { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
-                        { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
+                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
+                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } }
                     )
                     CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
@@ -238,6 +249,8 @@ private fun PlayerCard(
     track: Pair<String, String>,
     playing: Boolean,
     hasMedia: Boolean,
+    canSkipPrevious: Boolean,
+    canSkipNext: Boolean,
     onPlay: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit
@@ -265,8 +278,8 @@ private fun PlayerCard(
             Text(track.second, color = Muted, fontSize = 15.sp)
             Spacer(Modifier.height(20.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onPrevious, enabled = hasMedia) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (hasMedia) Color.White else Muted)
+                IconButton(onClick = onPrevious, enabled = canSkipPrevious) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (canSkipPrevious) Color.White else Muted)
                 }
                 FilledIconButton(onClick = onPlay, enabled = hasMedia,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent),
@@ -275,8 +288,8 @@ private fun PlayerCard(
                         contentDescription = if (playing) "Пауза демо" else "Запуск демо",
                         modifier = Modifier.size(30.dp))
                 }
-                IconButton(onClick = onNext, enabled = hasMedia) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (hasMedia) Color.White else Muted)
+                IconButton(onClick = onNext, enabled = canSkipNext) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (canSkipNext) Color.White else Muted)
                 }
             }
             Spacer(Modifier.height(12.dp))
