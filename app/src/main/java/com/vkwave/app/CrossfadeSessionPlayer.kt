@@ -45,6 +45,11 @@ class CrossfadeSessionPlayer(
             .build()
     }
 
+    override fun handlePrepare(): ListenableFuture<*> {
+        engine.prepare()
+        return Futures.immediateVoidFuture()
+    }
+
     override fun handleSetPlayWhenReady(playWhenReady: Boolean): ListenableFuture<*> {
         if (playWhenReady) {
             if (requestAudioFocus()) engine.play()
