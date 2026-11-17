@@ -283,10 +283,10 @@ class CrossfadeEngine(context: Context) {
                 }
 
                 outgoing.pause()
-                outgoingGain = 0f
-                incomingGain = 1f
                 active = incomingIndex
                 index = nextIndex
+                outgoingGain = 1f
+                incomingGain = 0f
                 completed = true
                 applyRepeatMode(incoming)
                 applyVolumes()
