@@ -169,8 +169,19 @@ class CrossfadeEngine(context: Context) {
         replaceMediaItems(fromIndex, toIndex, emptyList())
     }
 
+    fun prepare() {
+        if (released || activePlayer.mediaItemCount == 0) return
+        activePlayer.prepare()
+        prepareUpcoming()
+        startMonitor()
+    }
+
     fun play() {
-        if (!released) activePlayer.play()
+        if (released) return
+        if (activePlayer.playbackState == Player.STATE_IDLE && activePlayer.mediaItemCount > 0) {
+            prepare()
+        }
+        activePlayer.play()
     }
 
     fun pause() {
