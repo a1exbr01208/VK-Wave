@@ -7,6 +7,7 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -35,6 +36,7 @@ class CrossfadeEngine(context: Context) {
     private var playlist: List<Uri> = emptyList()
     private var index = 0
     private var failedNextIndex: Int? = null
+    private var queueGeneration = 0L
     private var released = false
 
     var crossfadeSeconds: Int = 7
@@ -42,6 +44,7 @@ class CrossfadeEngine(context: Context) {
 
     fun setQueue(items: List<Uri>, startIndex: Int = 0) {
         if (released) return
+        queueGeneration += 1
         transitionJob?.cancel()
         transitionJob = null
         monitorJob?.cancel()
@@ -115,7 +118,8 @@ class CrossfadeEngine(context: Context) {
         val incomingIndex = 1 - active
         val incoming = players[incomingIndex]
 
-        transitionJob = scope.launch {
+        val generation = queueGeneration
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             var completed = false
             try {
                 // The incoming item was pre-buffered by prepareUpcoming().
@@ -166,14 +170,18 @@ class CrossfadeEngine(context: Context) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
-                if (!completed && !released) {
+                if (!completed && !released && generation == queueGeneration) {
                     incoming.pause()
                     incoming.volume = 0f
                     outgoing.volume = 1f
                 }
-                transitionJob = null
+                if (transitionJob === coroutineContext[Job]) {
+                    transitionJob = null
+                }
             }
         }
+        transitionJob = job
+        job.start()
     }
 
     fun release() {
