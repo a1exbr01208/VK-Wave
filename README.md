@@ -38,10 +38,14 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - `MediaItemFactory` converts resolved tracks into the common Media3 queue format
 - Capability and connection-state models let the UI adapt to search, library, authentication and permissions
 - `LocalAudioSource` reads the device's indexed music through Android MediaStore and resolves local content URIs
+- `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs; read-only access currently works without user login or app secrets
+- The Search tab can search Audius and queue returned tracks through the same Media3 playback/crossfade engine
 - Local audio requires the Android audio-library permission; the app must request it at runtime before browsing
 
 ### Planned source adapters
 - VK Music, only if a supported access route becomes available
+- SoundCloud, subject to official app registration / API access and attribution requirements
+- Spotify remote-control adapter (not an in-app audio source; Spotify policies prohibit crossfading its content)
 - Other authorized streaming providers
 - User-owned local files and future document-provider imports
 
@@ -49,8 +53,8 @@ No provider is allowed to inject undocumented endpoints or bypass account protec
 
 ## Not implemented yet
 - Runtime permission request and local-library browsing UI
-- Source selection and unified search UI
-- Provider-specific authentication and catalog adapters
+- Unified search across multiple providers and provider selection UI
+- SoundCloud OAuth / app credentials, if access is granted
 - Physical-device playback verification
 
 The **Тест движка** action generates two original synthetic WAV tones in the app cache. No copyrighted sample audio is bundled.
