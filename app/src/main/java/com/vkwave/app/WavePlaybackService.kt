@@ -3,7 +3,7 @@ package com.vkwave.app
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.AudioAttributes as PlatformAudioAttributes
-import androidx.media3.common.UnstableApi
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
