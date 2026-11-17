@@ -7,6 +7,10 @@ import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
 import java.util.concurrent.Future
 import java.util.concurrent.Executor
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -43,11 +47,33 @@ private val waveTabs = listOf(
 
 class MainActivity : ComponentActivity() {
     private val mediaControllerState = mutableStateOf<MediaController?>(null)
+    private val crossfadeState = mutableFloatStateOf(7f)
     private var controllerFuture: Future<MediaController>? = null
+    private var saveCrossfadeJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { VKWaveApp(mediaControllerState.value) }
+        lifecycleScope.launch {
+            applicationContext.savedCrossfadeSeconds.collect { saved ->
+                crossfadeState.floatValue = saved.toFloat()
+            }
+        }
+        setContent {
+            VKWaveApp(
+                mediaControllerState.value,
+                crossfadeState.floatValue,
+                ::updateCrossfade
+            )
+        }
+    }
+
+    private fun updateCrossfade(seconds: Float) {
+        crossfadeState.floatValue = seconds
+        saveCrossfadeJob?.cancel()
+        saveCrossfadeJob = lifecycleScope.launch {
+            delay(350)
+            applicationContext.persistCrossfadeSeconds(seconds.toInt())
+        }
     }
 
     override fun onStart() {
@@ -75,9 +101,12 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun VKWaveApp(controller: MediaController?) {
+fun VKWaveApp(
+    controller: MediaController?,
+    crossfade: Float,
+    onCrossfadeChange: (Float) -> Unit
+) {
     var tab by remember { mutableStateOf("Главная") }
-    var crossfade by remember { mutableFloatStateOf(7f) }
     var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
     var hasMedia by remember(controller) { mutableStateOf((controller?.mediaItemCount ?: 0) > 0) }
 
@@ -119,7 +148,7 @@ fun VKWaveApp(controller: MediaController?) {
                         { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
                         { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
                     )
-                    CrossfadeCard(crossfade, { crossfade = it }, Modifier.padding(16.dp))
+                    CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
                         waveTabs.forEach { item ->
                             NavigationBarItem(
@@ -163,7 +192,7 @@ fun VKWaveApp(controller: MediaController?) {
                             { controller?.let { if (it.mediaItemCount > 0) it.seekToPreviousMediaItem() } },
                             { controller?.let { if (it.mediaItemCount > 0) it.seekToNextMediaItem() } }
                         )
-                        CrossfadeCard(crossfade, { crossfade = it }, Modifier.padding(top = 16.dp))
+                        CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
                 }
             }
