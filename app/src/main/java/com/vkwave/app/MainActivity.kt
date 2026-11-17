@@ -12,6 +12,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -116,6 +117,8 @@ fun VKWaveApp(
     var canSkipNext by remember(controller) {
         mutableStateOf(controller?.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM) == true)
     }
+    var positionMs by remember(controller) { mutableLongStateOf(0L) }
+    var durationMs by remember(controller) { mutableLongStateOf(0L) }
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
@@ -140,6 +143,19 @@ fun VKWaveApp(
         onDispose { controller?.removeListener(listener) }
     }
 
+    LaunchedEffect(controller, hasMedia, playing) {
+        if (controller == null || !hasMedia) {
+            positionMs = 0L
+            durationMs = 0L
+        } else {
+            while (isActive) {
+                positionMs = controller.currentPosition.coerceAtLeast(0L)
+                durationMs = controller.duration.takeIf { it > 0L } ?: 0L
+                delay(500)
+            }
+        }
+    }
+
     val currentTitle = controller?.currentMediaItem?.mediaMetadata?.title?.toString()
         ?.takeIf { it.isNotBlank() } ?: "VK Wave готов к воспроизведению"
     val currentArtist = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
@@ -155,10 +171,11 @@ fun VKWaveApp(
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
                     PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
+                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs,
                         { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                         { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
-                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } }
+                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
+                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(positionMs) } }
                     )
                     CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
@@ -203,7 +220,8 @@ fun VKWaveApp(
                             canSkipPrevious, canSkipNext,
                             { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                             { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
-                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } }
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(positionMs) } }
                         )
                         CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
@@ -252,10 +270,19 @@ private fun PlayerCard(
     hasMedia: Boolean,
     canSkipPrevious: Boolean,
     canSkipNext: Boolean,
+    positionMs: Long,
+    durationMs: Long,
     onPlay: () -> Unit,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onSeek: (Long) -> Unit
 ) {
+    var isScrubbing by remember { mutableStateOf(false) }
+    var seekValue by remember { mutableFloatStateOf(positionMs.toFloat()) }
+    LaunchedEffect(positionMs, isScrubbing) {
+        if (!isScrubbing) seekValue = positionMs.toFloat()
+    }
+    val seekMaximum = durationMs.toFloat().coerceAtLeast(1f)
     Box(
         modifier.clip(RoundedCornerShape(26.dp)).background(
             Brush.linearGradient(listOf(Color(0xFF35305B), Color(0xFF1C2738), Color(0xFF171922)))
@@ -277,7 +304,26 @@ private fun PlayerCard(
             Spacer(Modifier.height(22.dp))
             Text(track.first, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text(track.second, color = Muted, fontSize = 15.sp)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(12.dp))
+            Slider(
+                value = seekValue.coerceIn(0f, seekMaximum),
+                onValueChange = {
+                    isScrubbing = true
+                    seekValue = it
+                },
+                onValueChangeFinished = {
+                    onSeek(seekValue.toLong())
+                    isScrubbing = false
+                },
+                valueRange = 0f..seekMaximum,
+                enabled = hasMedia && durationMs > 0L,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text(formatPlaybackTime(if (isScrubbing) seekValue.toLong() else positionMs), color = Muted, fontSize = 10.sp)
+                Text(formatPlaybackTime(durationMs), color = Muted, fontSize = 10.sp)
+            }
+            Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPrevious, enabled = canSkipPrevious) {
                     Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (canSkipPrevious) Color.White else Muted)
@@ -298,6 +344,13 @@ private fun PlayerCard(
                 color = Color.White.copy(alpha = .6f), fontSize = 9.sp, letterSpacing = 1.sp)
         }
     }
+}
+
+private fun formatPlaybackTime(milliseconds: Long): String {
+    val totalSeconds = milliseconds.coerceAtLeast(0L) / 1_000L
+    val minutes = totalSeconds / 60L
+    val seconds = totalSeconds % 60L
+    return "$minutes:${seconds.toString().padStart(2, '0')}"
 }
 
 @Composable
