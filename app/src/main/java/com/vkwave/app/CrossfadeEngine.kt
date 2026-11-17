@@ -221,21 +221,61 @@ class CrossfadeEngine(context: Context) {
                 val outgoing = activePlayer
                 val duration = outgoing.duration
                 val nextIndex = nextIndexForAutomaticTransition()
-                if (nextIndex != null && outgoing.isPlaying &&
-                    duration > 0 && transitionJob == null &&
-                    failedNextIndex != nextIndex
-                ) {
-                    val remaining = duration - outgoing.currentPosition
-                    if (remaining in 0..(crossfadeSeconds * 1_000L)) {
-                        beginCrossfade(
-                            nextIndex,
-                            CrossfadeMath.actualFadeDurationMs(remaining, crossfadeSeconds)
-                        )
+                if (nextIndex != null && transitionJob == null) {
+                    if (outgoing.playbackState == Player.STATE_ENDED) {
+                        startGaplessFallback(nextIndex)
+                    } else if (outgoing.isPlaying && duration > 0 &&
+                        failedNextIndex != nextIndex
+                    ) {
+                        val remaining = duration - outgoing.currentPosition
+                        if (remaining in 0..(crossfadeSeconds * 1_000L)) {
+                            beginCrossfade(
+                                nextIndex,
+                                CrossfadeMath.actualFadeDurationMs(remaining, crossfadeSeconds)
+                            )
+                        }
                     }
                 }
                 delay(100)
             }
         }
+    }
+
+    private fun startGaplessFallback(nextIndex: Int) {
+        if (transitionJob?.isActive == true || released) return
+        val outgoing = activePlayer
+        val incomingIndex = 1 - active
+        val incoming = players[incomingIndex]
+        val job = scope.launch(start = CoroutineStart.LAZY) {
+            try {
+                if (incoming.mediaItemCount == 0 || incoming.playerError != null) {
+                    incoming.stop()
+                    incoming.clearMediaItems()
+                    incoming.setMediaItem(playlist[nextIndex])
+                    applyRepeatMode(incoming)
+                    incoming.prepare()
+                }
+                incoming.volume = 0f
+                incoming.play()
+                outgoing.stop()
+                outgoing.clearMediaItems()
+
+                active = incomingIndex
+                index = nextIndex
+                outgoingGain = 1f
+                incomingGain = 0f
+                failedNextIndex = null
+                applyVolumes()
+                onActivePlayerChanged?.invoke(incoming)
+                prepareUpcoming()
+            } finally {
+                if (transitionJob === coroutineContext[Job]) {
+                    transitionJob = null
+                }
+            }
+        }
+        transitionJob = job
+        job.start()
     }
 
     private fun beginCrossfade(nextIndex: Int, durationMs: Long) {
@@ -267,11 +307,27 @@ class CrossfadeEngine(context: Context) {
                 incoming.volume = 0f
                 incoming.play()
                 val steps = (durationMs / 40L).coerceAtLeast(1L).toInt()
-                repeat(steps) { step ->
+                for (step in 0 until steps) {
                     if (!outgoing.isPlaying) {
+                        if (outgoing.playbackState == Player.STATE_ENDED) {
+                            outgoingGain = 0f
+                            incomingGain = 1f
+                            applyVolumes()
+                            break
+                        }
                         incoming.pause()
-                        while (isActive && !outgoing.isPlaying && !released) delay(50)
+                        while (isActive && !outgoing.isPlaying &&
+                            outgoing.playbackState != Player.STATE_ENDED && !released
+                        ) {
+                            delay(50)
+                        }
                         if (!isActive || released) return@launch
+                        if (outgoing.playbackState == Player.STATE_ENDED) {
+                            outgoingGain = 0f
+                            incomingGain = 1f
+                            applyVolumes()
+                            break
+                        }
                         incoming.play()
                     }
 
