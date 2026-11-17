@@ -315,7 +315,7 @@ private fun SourceSearchScreen(
                         message = "Ищем треки…"
                         try {
                             tracks = provider.search(query).tracks
-                            message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: \${tracks.size}"
+                            message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: ${tracks.size}"
                         } catch (error: Exception) {
                             message = error.message ?: "Не удалось связаться с Audius"
                             tracks = emptyList()
