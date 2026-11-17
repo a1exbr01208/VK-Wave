@@ -2,7 +2,7 @@ package com.vkwave.app
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.UnstableApi
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.ForwardingSimpleBasePlayer
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
