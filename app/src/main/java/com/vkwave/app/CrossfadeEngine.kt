@@ -15,13 +15,11 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.min
 
 /**
  * Two-player equal-power crossfade engine.
- *
+ * The next item is prepared silently while the current item is playing.
  * Pass only media URIs that the signed-in user is authorized to play.
- * The incoming track starts at position zero while the outgoing track fades out.
  */
 class CrossfadeEngine(context: Context) {
     private val appContext = context.applicationContext
@@ -36,6 +34,7 @@ class CrossfadeEngine(context: Context) {
     private var monitorJob: Job? = null
     private var playlist: List<Uri> = emptyList()
     private var index = 0
+    private var failedNextIndex: Int? = null
     private var released = false
 
     var crossfadeSeconds: Int = 7
@@ -46,6 +45,7 @@ class CrossfadeEngine(context: Context) {
         transitionJob?.cancel()
         transitionJob = null
         monitorJob?.cancel()
+        failedNextIndex = null
         playlist = items.toList()
         index = startIndex.coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
 
@@ -58,6 +58,7 @@ class CrossfadeEngine(context: Context) {
 
         players[active].setMediaItem(MediaItem.fromUri(playlist[index]))
         players[active].prepare()
+        prepareUpcoming()
         startMonitor()
     }
 
@@ -70,19 +71,36 @@ class CrossfadeEngine(context: Context) {
         players.forEach { it.pause() }
     }
 
+    private fun prepareUpcoming() {
+        if (released || playlist.size < 2) return
+        val nextIndex = (index + 1) % playlist.size
+        if (failedNextIndex == nextIndex) return
+
+        val upcoming = players[1 - active]
+        upcoming.stop()
+        upcoming.clearMediaItems()
+        upcoming.volume = 0f
+        upcoming.setMediaItem(MediaItem.fromUri(playlist[nextIndex]))
+        upcoming.prepare()
+    }
+
     private fun startMonitor() {
         monitorJob?.cancel()
         monitorJob = scope.launch {
             while (isActive && !released) {
                 val outgoing = players[active]
                 val duration = outgoing.duration
+                val nextIndex = (index + 1) % playlist.size.coerceAtLeast(1)
                 if (playlist.size > 1 && outgoing.isPlaying &&
-                    duration > 0 && transitionJob == null
+                    duration > 0 && transitionJob == null &&
+                    failedNextIndex != nextIndex
                 ) {
                     val remaining = duration - outgoing.currentPosition
-                    val fadeMs = min(crossfadeSeconds * 1_000L, duration)
-                    if (remaining in 0..fadeMs) {
-                        beginCrossfade((index + 1) % playlist.size, fadeMs)
+                    if (remaining in 0..(crossfadeSeconds * 1_000L)) {
+                        beginCrossfade(
+                            nextIndex,
+                            CrossfadeMath.actualFadeDurationMs(remaining, crossfadeSeconds)
+                        )
                     }
                 }
                 delay(100)
@@ -100,12 +118,7 @@ class CrossfadeEngine(context: Context) {
         transitionJob = scope.launch {
             var completed = false
             try {
-                incoming.stop()
-                incoming.clearMediaItems()
-                incoming.setMediaItem(MediaItem.fromUri(playlist[nextIndex]))
-                incoming.volume = 0f
-                incoming.prepare()
-
+                // The incoming item was pre-buffered by prepareUpcoming().
                 val ready = withTimeoutOrNull(20_000L) {
                     while (isActive &&
                         incoming.playbackState != Player.STATE_READY &&
@@ -113,14 +126,16 @@ class CrossfadeEngine(context: Context) {
                     ) {
                         delay(50)
                     }
-                    incoming.playbackState == Player.STATE_READY
+                    incoming.playbackState == Player.STATE_READY &&
+                        incoming.playerError == null
                 } ?: false
 
-                if (!ready || incoming.playerError != null) {
-                    incoming.stop()
+                if (!ready) {
+                    failedNextIndex = nextIndex
                     return@launch
                 }
 
+                incoming.volume = 0f
                 incoming.play()
                 val steps = (durationMs / 40L).coerceAtLeast(1L).toInt()
                 repeat(steps) { step ->
@@ -143,6 +158,11 @@ class CrossfadeEngine(context: Context) {
                 active = incomingIndex
                 index = nextIndex
                 completed = true
+
+                outgoing.stop()
+                outgoing.clearMediaItems()
+                failedNextIndex = null
+                prepareUpcoming()
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
