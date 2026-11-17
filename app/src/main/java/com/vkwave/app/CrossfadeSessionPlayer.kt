@@ -21,10 +21,6 @@ class CrossfadeSessionPlayer(
     private val abandonAudioFocus: () -> Unit
 ) : ForwardingSimpleBasePlayer(initialPlayer) {
 
-    fun switchTo(player: Player) {
-        setPlayer(player)
-    }
-
     override fun getState(): State {
         val state = super.getState()
         val commands = state.availableCommands.buildUpon()
@@ -94,18 +90,8 @@ class CrossfadeSessionPlayer(
         return Futures.immediateVoidFuture()
     }
 
-    override fun handleSetVolume(
-        volume: Float,
-        volumeOperationType: Int
-    ): ListenableFuture<*> {
-        when (volumeOperationType) {
-            androidx.media3.common.C.VOLUME_OPERATION_TYPE_SET_VOLUME ->
-                engine.setMasterVolume(volume)
-            androidx.media3.common.C.VOLUME_OPERATION_TYPE_MUTE ->
-                engine.setMasterVolume(0f)
-            androidx.media3.common.C.VOLUME_OPERATION_TYPE_UNMUTE ->
-                engine.setMasterVolume(1f)
-        }
+    override fun handleSetVolume(volume: Float): ListenableFuture<*> {
+        engine.setMasterVolume(volume)
         return Futures.immediateVoidFuture()
     }
 
