@@ -64,8 +64,20 @@ class MainActivity : ComponentActivity() {
             VKWaveApp(
                 mediaControllerState.value,
                 crossfadeState.floatValue,
-                ::updateCrossfade
+                ::updateCrossfade,
+                ::startDemoPlayback
             )
+        }
+    }
+
+    private fun startDemoPlayback() {
+        val controller = mediaControllerState.value ?: return
+        lifecycleScope.launch {
+            val items = DemoAudioProvider(applicationContext).createPlaylist()
+            if (mediaControllerState.value !== controller) return@launch
+            controller.setMediaItems(items, 0, 0L)
+            controller.prepare()
+            controller.play()
         }
     }
 
@@ -106,7 +118,8 @@ class MainActivity : ComponentActivity() {
 fun VKWaveApp(
     controller: MediaController?,
     crossfade: Float,
-    onCrossfadeChange: (Float) -> Unit
+    onCrossfadeChange: (Float) -> Unit,
+    onDemoPlayback: () -> Unit
 ) {
     var tab by remember { mutableStateOf("Главная") }
     var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
@@ -171,11 +184,12 @@ fun VKWaveApp(
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
                     PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs,
+                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                         { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                         { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
                         { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
-                        { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } }
+                        { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
+                        onDemoPlayback
                     )
                     CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
@@ -217,11 +231,12 @@ fun VKWaveApp(
                         Spacer(Modifier.height(20.dp))
                         PlayerCard(
                             Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
-                            canSkipPrevious, canSkipNext, positionMs, durationMs,
+                            canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                             { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                             { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
                             { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
-                            { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } }
+                            { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
+                            onDemoPlayback
                         )
                         CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
@@ -272,10 +287,12 @@ private fun PlayerCard(
     canSkipNext: Boolean,
     positionMs: Long,
     durationMs: Long,
+    canRunDemo: Boolean,
     onPlay: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onSeek: (Long) -> Unit
+    onSeek: (Long) -> Unit,
+    onDemoPlayback: () -> Unit
 ) {
     var isScrubbing by remember { mutableStateOf(false) }
     var seekValue by remember { mutableFloatStateOf(positionMs.toFloat()) }
@@ -342,6 +359,11 @@ private fun PlayerCard(
             Spacer(Modifier.height(12.dp))
             Text(if (hasMedia) "УПРАВЛЕНИЕ ЧЕРЕЗ ANDROID MEDIA SESSION" else "НЕТ ДОСТУПНОГО ИСТОЧНИКА АУДИО",
                 color = Color.White.copy(alpha = .6f), fontSize = 9.sp, letterSpacing = 1.sp)
+            TextButton(onClick = onDemoPlayback, enabled = canRunDemo) {
+                Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Тест движка · 2 синтезированных тона", fontSize = 11.sp)
+            }
         }
     }
 }
