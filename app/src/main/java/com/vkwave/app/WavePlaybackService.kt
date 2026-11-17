@@ -6,6 +6,12 @@ import android.media.AudioAttributes as PlatformAudioAttributes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * Owns both playback decks and the Android media session outside the activity
@@ -20,6 +26,7 @@ class WavePlaybackService : MediaSessionService() {
     private var audioManager: AudioManager? = null
     private var audioFocusRequest: AudioFocusRequest? = null
     private var resumeOnFocusGain = false
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     private val focusChangeListener = AudioManager.OnAudioFocusChangeListener { change ->
         val engine = crossfadeEngine ?: return@OnAudioFocusChangeListener
@@ -50,6 +57,11 @@ class WavePlaybackService : MediaSessionService() {
 
         val engine = CrossfadeEngine(this)
         crossfadeEngine = engine
+        serviceScope.launch {
+            applicationContext.savedCrossfadeSeconds.collect { seconds ->
+                engine.crossfadeSeconds = seconds
+            }
+        }
 
         val decks = engine.deckPlayers
         val adapters = decks.map { deck ->
@@ -113,6 +125,7 @@ class WavePlaybackService : MediaSessionService() {
         sessionPlayers = emptyList()
         crossfadeEngine?.release()
         crossfadeEngine = null
+        serviceScope.cancel()
         audioManager = null
         super.onDestroy()
     }
