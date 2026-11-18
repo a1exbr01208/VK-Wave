@@ -493,6 +493,16 @@ class CrossfadeEngine(context: Context) {
                 )
                 val steps = (effectiveDurationMs / 40L).coerceAtLeast(1L).toInt()
                 for (step in 0 until steps) {
+                    // A very short incoming track can finish before the fade loop
+                    // gets its final scheduled tick. Complete the handoff at once;
+                    // the monitor will then advance the queue from the ended deck.
+                    if (incoming.playbackState == Player.STATE_ENDED) {
+                        outgoingGain = 0f
+                        incomingGain = 1f
+                        applyVolumes()
+                        break
+                    }
+
                     if (incoming.playerError != null || incoming.playbackState == Player.STATE_IDLE) {
                         unavailableQueueIndexes.add(nextIndex)
                         onQueueStateChanged?.invoke()
