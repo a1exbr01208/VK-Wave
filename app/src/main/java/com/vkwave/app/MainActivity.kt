@@ -248,6 +248,7 @@ fun VKWaveApp(
                             onPlaySourceTracks
                         )
                         "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
+                        "Настройки" -> SettingsScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
                         else -> PlayerCard(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
@@ -301,6 +302,7 @@ fun VKWaveApp(
                             "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth())
+                            "Настройки" -> SettingsScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth())
                             else -> PlayerCard(
                                 Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
                                 canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
@@ -316,6 +318,96 @@ fun VKWaveApp(
                 }
             }
         }
+    }
+}
+
+private suspend fun loadSourceStatusLabels(registry: MusicSourceRegistry): Map<String, String> {
+    val labels = linkedMapOf<String, String>()
+    for (descriptor in registry.all()) {
+        val state = try {
+            registry.get(descriptor.id)?.connectionState()
+                ?: SourceConnectionState.Unavailable("Источник отключён")
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            SourceConnectionState.Unavailable(error.message ?: "Не удалось проверить источник")
+        }
+        labels[descriptor.id] = when (state) {
+            SourceConnectionState.Available -> "Готов к работе"
+            SourceConnectionState.NeedsPermission -> "Ожидает разрешения Android"
+            SourceConnectionState.NeedsAuthentication -> "Требуется авторизация"
+            is SourceConnectionState.NeedsConfiguration -> state.reason
+            is SourceConnectionState.Unavailable -> state.reason
+        }
+    }
+    return labels
+}
+
+@Composable
+private fun SettingsScreen(
+    sourceRegistry: MusicSourceRegistry,
+    modifier: Modifier = Modifier
+) {
+    var statuses by remember { mutableStateOf(emptyMap<String, String>()) }
+    var refreshing by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    suspend fun refreshStatuses() {
+        refreshing = true
+        try {
+            statuses = loadSourceStatusLabels(sourceRegistry)
+        } finally {
+            refreshing = false
+        }
+    }
+
+    LaunchedEffect(sourceRegistry) { refreshStatuses() }
+
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Настройки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Подключённые музыкальные источники", color = Muted, fontSize = 13.sp)
+        OutlinedButton(
+            onClick = { scope.launch { refreshStatuses() } },
+            enabled = !refreshing,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(if (refreshing) "Проверяем источники…" else "Обновить состояние")
+        }
+        sourceRegistry.all().forEach { descriptor ->
+            val capabilities = buildList {
+                if (descriptor.capabilities.search) add("Поиск")
+                if (descriptor.capabilities.library) add("Медиатека")
+                if (descriptor.capabilities.playlists) add("Плейлисты")
+                if (descriptor.capabilities.offlinePlayback) add("Офлайн")
+                if (descriptor.capabilities.authentication) add("Авторизация")
+            }
+            Surface(
+                color = Panel,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    Text(descriptor.displayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(statuses[descriptor.id] ?: "Проверяем…", color = Muted, fontSize = 12.sp)
+                    Text(
+                        capabilities.joinToString(" · ").ifBlank { "Возможности не заявлены" },
+                        color = Muted,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+        Text(
+            "VK Music подключим только через поддерживаемый официальный доступ. Авторизация VK ID сама по себе не открывает музыкальный каталог.",
+            color = Muted,
+            fontSize = 12.sp
+        )
     }
 }
 
@@ -409,6 +501,8 @@ private fun SourceSearchScreen(
     var loading by remember { mutableStateOf(false) }
     var hasSearched by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    var searchJob by remember { mutableStateOf<Job?>(null) }
+    var searchGeneration by remember { mutableIntStateOf(0) }
     val loadingMore = groups.any { it.loadingMore }
 
     fun loadNextPage(group: SourceSearchGroup) {
@@ -416,6 +510,7 @@ private fun SourceSearchScreen(
         if (loading || group.loadingMore) return
         val searchQuery = query.trim()
         if (searchQuery.isEmpty()) return
+        val generation = searchGeneration
         groups = groups.map { current ->
             if (current.source.id == group.source.id) current.copy(loadingMore = true, message = null)
             else current
@@ -425,6 +520,7 @@ private fun SourceSearchScreen(
                 val provider = sourceRegistry.get(group.source.id)
                     ?: throw IllegalStateException("Источник отключён")
                 val page = provider.search(searchQuery, token)
+                if (generation != searchGeneration || query.trim() != searchQuery) return@launch
                 groups = groups.map { current ->
                     if (current.source.id != group.source.id) current
                     else current.copy(
@@ -434,7 +530,10 @@ private fun SourceSearchScreen(
                         message = if (page.tracks.isEmpty()) "Больше результатов нет" else null
                     )
                 }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
+                if (generation != searchGeneration) return@launch
                 groups = groups.map { current ->
                     if (current.source.id == group.source.id) current.copy(
                         loadingMore = false,
@@ -462,12 +561,15 @@ private fun SourceSearchScreen(
             onClick = {
                 val searchQuery = query.trim()
                 if (searchQuery.isNotEmpty()) {
-                    scope.launch {
+                    searchGeneration += 1
+                    val generation = searchGeneration
+                    searchJob?.cancel()
+                    groups = emptyList()
+                    searchJob = scope.launch {
                         loading = true
                         hasSearched = true
-                        groups = emptyList()
                         try {
-                            groups = coroutineScope {
+                            val results = coroutineScope {
                                 sources.map { descriptor ->
                                     async {
                                         val provider = sourceRegistry.get(descriptor.id)
@@ -491,14 +593,17 @@ private fun SourceSearchScreen(
                                                 is SourceConnectionState.Unavailable ->
                                                     SourceSearchGroup(descriptor, message = state.reason)
                                             }
+                                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                            throw cancelled
                                         } catch (error: Exception) {
                                             SourceSearchGroup(descriptor, message = error.message ?: "Ошибка поиска")
                                         }
                                     }
                                 }.awaitAll()
                             }
+                            if (generation == searchGeneration) groups = results
                         } finally {
-                            loading = false
+                            if (generation == searchGeneration) loading = false
                         }
                     }
                 }
