@@ -520,7 +520,7 @@ private fun SourceSearchScreen(
                 val provider = sourceRegistry.get(group.source.id)
                     ?: throw IllegalStateException("Источник отключён")
                 val page = provider.search(searchQuery, token)
-                if (generation != searchGeneration || query.trim() != searchQuery) return@launch
+                if (generation != searchGeneration) return@launch
                 groups = groups.map { current ->
                     if (current.source.id != group.source.id) current
                     else current.copy(
