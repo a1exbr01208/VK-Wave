@@ -60,6 +60,7 @@ private val waveTabs = listOf(
     WaveTab("Главная", Icons.Default.Home),
     WaveTab("Поиск", Icons.Default.Search),
     WaveTab("Медиатека", Icons.Default.LibraryMusic),
+    WaveTab("Очередь", Icons.Default.QueueMusic),
     WaveTab("Настройки", Icons.Default.Settings)
 )
 
@@ -229,6 +230,7 @@ fun VKWaveApp(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             onPlaySourceTracks
                         )
+                        "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
                         else -> PlayerCard(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
@@ -281,6 +283,7 @@ fun VKWaveApp(
                         when (tab) {
                             "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
+                            "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth())
                             else -> PlayerCard(
                                 Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
                                 canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
@@ -533,6 +536,112 @@ private fun SourceSearchScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (group.loadingMore) "Загружаем…" else "Ещё результаты")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QueueScreen(
+    controller: MediaController?,
+    modifier: Modifier = Modifier
+) {
+    var revision by remember(controller) { mutableIntStateOf(0) }
+    DisposableEffect(controller) {
+        val listener = object : Player.Listener {
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                revision++
+            }
+            override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
+                revision++
+            }
+        }
+        controller?.addListener(listener)
+        onDispose { controller?.removeListener(listener) }
+    }
+
+    val queue = remember(controller, revision) {
+        controller?.let { player ->
+            List(player.mediaItemCount) { index -> player.getMediaItemAt(index) }
+        } ?: emptyList()
+    }
+    val currentIndex = controller?.currentMediaItemIndex ?: -1
+    val canChange = controller?.isCommandAvailable(Player.COMMAND_CHANGE_MEDIA_ITEMS) == true
+
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column {
+                Text("Очередь воспроизведения", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("${queue.size} треков", color = Muted, fontSize = 12.sp)
+            }
+            TextButton(
+                onClick = { if (canChange) controller?.clearMediaItems() },
+                enabled = canChange && queue.isNotEmpty()
+            ) {
+                Text("Очистить")
+            }
+        }
+
+        if (controller == null) {
+            Text("Подключаем плеер…", color = Muted)
+        } else if (queue.isEmpty()) {
+            Text("Очередь пока пуста. Найди музыку или запусти тест движка.", color = Muted)
+        } else {
+            queue.forEachIndexed { index, item ->
+                val title = item.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() } ?: "Без названия"
+                val artist = item.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: "Неизвестный исполнитель"
+                val selected = index == currentIndex
+                Surface(
+                    color = if (selected) Accent.copy(alpha = .16f) else Panel,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().clickable {
+                        if (controller.isCommandAvailable(Player.COMMAND_SEEK_TO_MEDIA_ITEM)) {
+                            controller.seekTo(index, 0L)
+                            controller.play()
+                        }
+                    }
+                ) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            if (selected) Icons.Default.GraphicEq else Icons.Default.MusicNote,
+                            contentDescription = if (selected) "Сейчас играет" else null,
+                            tint = if (selected) Accent else Muted
+                        )
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                            Text(title, color = Color.White, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                            Text(artist, color = Muted, fontSize = 12.sp)
+                        }
+                        IconButton(
+                            onClick = { if (canChange && index > 0) controller.moveMediaItem(index, index - 1) },
+                            enabled = canChange && index > 0
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Переместить выше", tint = Muted)
+                        }
+                        IconButton(
+                            onClick = { if (canChange && index < queue.lastIndex) controller.moveMediaItem(index, index + 1) },
+                            enabled = canChange && index < queue.lastIndex
+                        ) {
+                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Переместить ниже", tint = Muted)
+                        }
+                        IconButton(
+                            onClick = { if (canChange) controller.removeMediaItem(index) },
+                            enabled = canChange
+                        ) {
+                            Icon(Icons.Default.DeleteOutline, contentDescription = "Удалить из очереди", tint = Muted)
+                        }
                     }
                 }
             }
