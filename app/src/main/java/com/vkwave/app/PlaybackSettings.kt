@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.map
 private val Context.playbackSettingsDataStore by preferencesDataStore(name = "playback_settings")
 private val crossfadeSecondsKey = intPreferencesKey("crossfade_seconds")
 private val jamendoClientIdKey = stringPreferencesKey("jamendo_client_id")
+private val waveThemeKey = stringPreferencesKey("wave_theme")
 
 val Context.savedCrossfadeSeconds: Flow<Int>
     get() = playbackSettingsDataStore.data.map { preferences ->
@@ -31,5 +32,16 @@ val Context.savedJamendoClientId: Flow<String?>
 suspend fun Context.persistJamendoClientId(clientId: String) {
     playbackSettingsDataStore.edit { preferences ->
         preferences[jamendoClientIdKey] = clientId.trim()
+    }
+}
+
+val Context.savedWaveTheme: Flow<String>
+    get() = playbackSettingsDataStore.data.map { preferences ->
+        preferences[waveThemeKey]?.takeIf { it in setOf("dark", "light", "glass") } ?: "dark"
+    }
+
+suspend fun Context.persistWaveTheme(theme: String) {
+    playbackSettingsDataStore.edit { preferences ->
+        preferences[waveThemeKey] = theme.takeIf { it in setOf("dark", "light", "glass") } ?: "dark"
     }
 }
