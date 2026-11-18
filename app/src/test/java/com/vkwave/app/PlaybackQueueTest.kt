@@ -43,7 +43,8 @@ class PlaybackQueueTest {
     @Test
     fun repeatOffDoesNotWrapAndRepeatOneDoesNotAdvanceQueue() {
         assertEquals(emptyList<Int>(), nextPlayableQueueIndexes(3, 2, QueueRepeatMode.OFF))
-        assertEquals(emptyList<Int>(), nextPlayableQueueIndexes(3, 1, QueueRepeatMode.ONE))
+        // Repeat ONE affects automatic advancement, not a manual next command.
+        assertEquals(listOf(2), nextPlayableQueueIndexes(3, 1, QueueRepeatMode.ONE))
     }
 
     @Test
