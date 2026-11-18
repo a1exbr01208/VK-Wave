@@ -38,9 +38,10 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - `MediaItemFactory` converts resolved tracks into the common Media3 queue format
 - Capability and connection-state models let the UI adapt to search, library, authentication and permissions
 - `LocalAudioSource` reads the device's indexed music through Android MediaStore and resolves local content URIs
-- `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs; read-only access currently works without user login or app secrets
-- The Search tab can search Audius and queue returned tracks through the same Media3 playback/crossfade engine
-- Local audio requires the Android audio-library permission; the app must request it at runtime before browsing
+- `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs
+- `JamendoMusicSource` uses the official Jamendo API v3 for independent-music search and playback redirects; configure `JAMENDO_CLIENT_ID` in the local `local.properties` file
+- Search now discovers providers from the registry and lets the user switch between available catalogs
+- Local audio requests Android audio-library permission at runtime and exposes a browsable device library
 
 ### Planned source adapters
 - VK Music, only if a supported access route becomes available
@@ -52,8 +53,6 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 No provider is allowed to inject undocumented endpoints or bypass account protections. The public VK Audio API is not generally available to third-party apps, and VK ID OAuth alone does not grant catalog access. VK remains an optional adapter, not a dependency of the player.
 
 ## Not implemented yet
-- Runtime permission request and local-library browsing UI
-- Unified search across multiple providers and provider selection UI
 - SoundCloud OAuth / app credentials, if access is granted
 - Physical-device playback verification
 
