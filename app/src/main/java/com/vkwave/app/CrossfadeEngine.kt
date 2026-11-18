@@ -48,7 +48,7 @@ class CrossfadeEngine(context: Context) {
     private var monitorJob: Job? = null
     private var playlist: List<MediaItem> = emptyList()
     private var index = 0
-    private var failedNextIndex: Int? = null
+    private val unavailableQueueIndexes = mutableSetOf<Int>()
     private var queueGeneration = 0L
     private var released = false
     private var outgoingGain = 1f
@@ -81,10 +81,14 @@ class CrossfadeEngine(context: Context) {
         get() = !released && activePlayer.isPlaying
 
     val canSkipNext: Boolean
-        get() = playlist.size > 1 && (index < playlist.lastIndex || repeatMode == QueueRepeatMode.ALL)
+        get() = nextPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).isNotEmpty()
 
     val canSkipPrevious: Boolean
-        get() = playlist.size > 1 && (index > 0 || repeatMode == QueueRepeatMode.ALL)
+        get() = previousPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).isNotEmpty()
 
     fun setQueue(items: List<MediaItem>, startIndex: Int = 0, startPositionMs: Long = 0L) {
         if (released) return
@@ -93,7 +97,7 @@ class CrossfadeEngine(context: Context) {
         transitionJob?.cancel()
         transitionJob = null
         monitorJob?.cancel()
-        failedNextIndex = null
+        unavailableQueueIndexes.clear()
         playlist = items.toList()
         index = if (playlist.isEmpty()) 0 else startIndex.coerceIn(playlist.indices)
 
@@ -215,19 +219,22 @@ class CrossfadeEngine(context: Context) {
     fun setRepeatMode(mode: QueueRepeatMode) {
         repeatMode = mode
         players.forEach(::applyRepeatMode)
-        failedNextIndex = null
         if (transitionJob?.isActive != true) prepareUpcoming()
     }
 
     fun skipToNext(): Boolean {
-        if (!canSkipNext || released) return false
-        val nextIndex = if (index < playlist.lastIndex) index + 1 else 0
+        if (released) return false
+        val nextIndex = nextPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).firstOrNull() ?: return false
         return jumpTo(nextIndex)
     }
 
     fun skipToPrevious(): Boolean {
-        if (!canSkipPrevious || released) return false
-        val previousIndex = if (index > 0) index - 1 else playlist.lastIndex
+        if (released) return false
+        val previousIndex = previousPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).firstOrNull() ?: return false
         return jumpTo(previousIndex)
     }
 
@@ -241,7 +248,7 @@ class CrossfadeEngine(context: Context) {
         transitionJob?.cancel()
         transitionJob = null
         monitorJob?.cancel()
-        failedNextIndex = null
+        unavailableQueueIndexes.remove(targetIndex)
 
         val current = activePlayer
         val standby = players[1 - active]
@@ -271,18 +278,15 @@ class CrossfadeEngine(context: Context) {
     }
 
     private fun nextIndexForAutomaticTransition(): Int? {
-        if (playlist.size < 2 || repeatMode == QueueRepeatMode.ONE) return null
-        return when {
-            index < playlist.lastIndex -> index + 1
-            repeatMode == QueueRepeatMode.ALL -> 0
-            else -> null
-        }
+        if (repeatMode == QueueRepeatMode.ONE) return null
+        return nextPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).firstOrNull()
     }
 
     private fun prepareUpcoming() {
         if (released) return
         val nextIndex = nextIndexForAutomaticTransition() ?: return
-        if (failedNextIndex == nextIndex) return
 
         val upcoming = players[1 - active]
         upcoming.stop()
@@ -303,9 +307,7 @@ class CrossfadeEngine(context: Context) {
                 if (nextIndex != null && transitionJob == null) {
                     if (outgoing.playbackState == Player.STATE_ENDED || outgoing.playerError != null) {
                         startGaplessFallback(nextIndex)
-                    } else if (outgoing.isPlaying && duration > 0 &&
-                        failedNextIndex != nextIndex
-                    ) {
+                    } else if (outgoing.isPlaying && duration > 0) {
                         val remaining = duration - outgoing.currentPosition
                         if (remaining in 0..(crossfadeSeconds * 1_000L)) {
                             beginCrossfade(
@@ -325,28 +327,65 @@ class CrossfadeEngine(context: Context) {
         val outgoing = activePlayer
         val incomingIndex = 1 - active
         val incoming = players[incomingIndex]
+        val generation = queueGeneration
+        val candidates = nextPlayableQueueIndexes(
+            playlist.size, index, repeatMode, unavailableQueueIndexes
+        ).dropWhile { it != nextIndex }
+        if (candidates.isEmpty()) return
+
         val job = scope.launch(start = CoroutineStart.LAZY) {
             try {
-                if (incoming.mediaItemCount == 0 || incoming.playerError != null) {
+                for (candidate in candidates) {
+                    if (!isActive || released || generation != queueGeneration) return@launch
+                    val item = playlist.getOrNull(candidate) ?: continue
+
                     incoming.stop()
                     incoming.clearMediaItems()
-                    incoming.setMediaItem(playlist[nextIndex])
+                    incoming.setMediaItem(item)
                     applyRepeatMode(incoming)
                     incoming.prepare()
-                }
-                incoming.volume = 0f
-                incoming.play()
-                outgoing.stop()
-                outgoing.clearMediaItems()
 
-                active = incomingIndex
-                index = nextIndex
+                    val ready = withTimeoutOrNull(20_000L) {
+                        while (isActive &&
+                            incoming.playbackState != Player.STATE_READY &&
+                            incoming.playerError == null
+                        ) {
+                            delay(50)
+                        }
+                        incoming.playbackState == Player.STATE_READY &&
+                            incoming.playerError == null
+                    } ?: false
+
+                    if (!ready) {
+                        unavailableQueueIndexes.add(candidate)
+                        incoming.stop()
+                        incoming.clearMediaItems()
+                        continue
+                    }
+
+                    incoming.volume = 0f
+                    incoming.play()
+                    outgoing.stop()
+                    outgoing.clearMediaItems()
+
+                    active = incomingIndex
+                    index = candidate
+                    outgoingGain = 1f
+                    incomingGain = 0f
+                    applyVolumes()
+                    onActivePlayerChanged?.invoke(incoming)
+                    prepareUpcoming()
+                    return@launch
+                }
+
+                // Every remaining candidate failed. Stop the ended/error deck
+                // and leave the queue intact so the user can manually retry one.
+                outgoing.stop()
+                incoming.stop()
+                incoming.clearMediaItems()
                 outgoingGain = 1f
                 incomingGain = 0f
-                failedNextIndex = null
                 applyVolumes()
-                onActivePlayerChanged?.invoke(incoming)
-                prepareUpcoming()
             } finally {
                 if (transitionJob === coroutineContext[Job]) {
                     transitionJob = null
@@ -379,7 +418,10 @@ class CrossfadeEngine(context: Context) {
                 } ?: false
 
                 if (!ready) {
-                    failedNextIndex = nextIndex
+                    unavailableQueueIndexes.add(nextIndex)
+                    incoming.stop()
+                    incoming.clearMediaItems()
+                    prepareUpcoming()
                     return@launch
                 }
 
@@ -387,6 +429,17 @@ class CrossfadeEngine(context: Context) {
                 incoming.play()
                 val steps = (durationMs / 40L).coerceAtLeast(1L).toInt()
                 for (step in 0 until steps) {
+                    if (incoming.playerError != null || incoming.playbackState == Player.STATE_IDLE) {
+                        unavailableQueueIndexes.add(nextIndex)
+                        incoming.stop()
+                        incoming.clearMediaItems()
+                        outgoingGain = 1f
+                        incomingGain = 0f
+                        applyVolumes()
+                        prepareUpcoming()
+                        return@launch
+                    }
+
                     if (!outgoing.isPlaying) {
                         if (outgoing.playbackState == Player.STATE_ENDED || outgoing.playerError != null) {
                             outgoingGain = 0f
@@ -427,7 +480,6 @@ class CrossfadeEngine(context: Context) {
                 applyVolumes()
                 outgoing.stop()
                 outgoing.clearMediaItems()
-                failedNextIndex = null
                 onActivePlayerChanged?.invoke(incoming)
                 prepareUpcoming()
             } catch (cancelled: CancellationException) {
