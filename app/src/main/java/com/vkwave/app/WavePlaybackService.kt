@@ -75,6 +75,9 @@ class WavePlaybackService : MediaSessionService() {
         sessionPlayers = adapters
 
         mediaSession = MediaSession.Builder(this, adapters.first()).build()
+        engine.onQueueStateChanged = {
+            adapters.forEach { it.refreshEngineState() }
+        }
         engine.onActivePlayerChanged = { activeDeck ->
             val activeIndex = decks.indexOfFirst { it === activeDeck }
             if (activeIndex >= 0) {
