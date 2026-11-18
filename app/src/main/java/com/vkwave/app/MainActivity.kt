@@ -3,6 +3,7 @@ package com.vkwave.app
 import android.os.Bundle
 import android.Manifest
 import android.os.Build
+import android.widget.Toast
 import android.content.ComponentName
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -71,6 +72,7 @@ class MainActivity : ComponentActivity() {
     private var controllerFuture: Future<MediaController>? = null
     private var saveCrossfadeJob: Job? = null
     private var resolvePlaybackJob: Job? = null
+    private var playbackRequestGeneration = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -99,43 +101,101 @@ class MainActivity : ComponentActivity() {
 
     private fun startDemoPlayback() {
         val controller = mediaControllerState.value ?: return
+        val generation = ++playbackRequestGeneration
         resolvePlaybackJob?.cancel()
-        resolvePlaybackJob = null
-        lifecycleScope.launch {
-            val items = DemoAudioProvider(applicationContext).createPlaylist()
-            if (mediaControllerState.value !== controller) return@launch
-            controller.setMediaItems(items, 0, 0L)
-            controller.prepare()
-            controller.play()
+        resolvePlaybackJob = lifecycleScope.launch {
+            try {
+                val items = DemoAudioProvider(applicationContext).createPlaylist()
+                if (generation != playbackRequestGeneration ||
+                    mediaControllerState.value !== controller
+                ) return@launch
+                controller.setMediaItems(items, 0, 0L)
+                controller.prepare()
+                controller.play()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (generation == playbackRequestGeneration) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Не удалось создать тестовые аудиофайлы",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } finally {
+                if (generation == playbackRequestGeneration) resolvePlaybackJob = null
+            }
         }
     }
 
     private fun playSourceTracks(tracks: List<WaveTrack>, startIndex: Int) {
         val controller = mediaControllerState.value ?: return
+        val generation = ++playbackRequestGeneration
         resolvePlaybackJob?.cancel()
         resolvePlaybackJob = lifecycleScope.launch {
-            val resolved = tracks.mapIndexedNotNull { originalIndex, track ->
-                val source = musicSources.get(track.sourceId) ?: return@mapIndexedNotNull null
-                val uri = try {
-                    source.resolvePlayback(track)
-                } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                    throw cancelled
-                } catch (_: Exception) {
-                    null
-                } ?: return@mapIndexedNotNull null
-                originalIndex to track.toMediaItem(uri)
-            }
+            try {
+                val resolved = tracks.mapIndexedNotNull { originalIndex, track ->
+                    val source = musicSources.get(track.sourceId) ?: return@mapIndexedNotNull null
+                    val uri = try {
+                        source.resolvePlayback(track)
+                    } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                        throw cancelled
+                    } catch (_: Exception) {
+                        null
+                    } ?: return@mapIndexedNotNull null
+                    originalIndex to track.toMediaItem(uri)
+                }
 
-            if (resolved.isNotEmpty() && mediaControllerState.value === controller) {
+                if (generation != playbackRequestGeneration ||
+                    mediaControllerState.value !== controller
+                ) return@launch
+
+                if (resolved.isEmpty()) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Не удалось получить аудиопоток ни для одного трека",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@launch
+                }
+
+                if (resolved.size < tracks.size) {
+                    val skipped = tracks.size - resolved.size
+                    Toast.makeText(
+                        applicationContext,
+                        "Пропущено треков без доступного потока: $skipped",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+
                 // If the requested track could not be resolved, start at the next
-                // playable result rather than accidentally shifting to an earlier track.
+                // playable result or the nearest earlier playable result.
                 val resolvedStart = resolveQueueStartIndex(
                     resolved.map { it.first },
                     startIndex
                 ) ?: return@launch
+                if (resolved[resolvedStart].first != startIndex) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Выбранный трек недоступен, запускаю ближайший доступный",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
                 controller.setMediaItems(resolved.map { it.second }, resolvedStart, 0L)
                 controller.prepare()
                 controller.play()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (generation == playbackRequestGeneration) {
+                    Toast.makeText(
+                        applicationContext,
+                        "Не удалось подготовить выбранную музыку",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            } finally {
+                if (generation == playbackRequestGeneration) resolvePlaybackJob = null
             }
         }
     }
@@ -166,6 +226,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        playbackRequestGeneration += 1
         resolvePlaybackJob?.cancel()
         resolvePlaybackJob = null
         mediaControllerState.value = null
