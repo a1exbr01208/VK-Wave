@@ -862,58 +862,69 @@ private fun QueueScreen(
     val currentIndex = controller?.currentMediaItemIndex ?: -1
     val canChange = controller?.isCommandAvailable(Player.COMMAND_CHANGE_MEDIA_ITEMS) == true
 
-    Column(
-        modifier.verticalScroll(rememberScrollState()),
+    LazyColumn(
+        modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column {
-                Text("Очередь воспроизведения", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                Text("${queue.size} треков", color = Muted, fontSize = 12.sp)
-            }
-            TextButton(
-                onClick = { if (canChange) controller?.clearMediaItems() },
-                enabled = canChange && queue.isNotEmpty()
+        item(key = "queue-header") {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Очистить")
+                Column {
+                    Text("Очередь воспроизведения", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("${queue.size} треков", color = Muted, fontSize = 12.sp)
+                }
+                TextButton(
+                    onClick = { if (canChange) controller?.clearMediaItems() },
+                    enabled = canChange && queue.isNotEmpty()
+                ) {
+                    Text("Очистить")
+                }
             }
         }
 
         if (controller != null) {
-            val repeatLabel = when (controller.repeatMode) {
-                Player.REPEAT_MODE_ONE -> "Повтор: трек"
-                Player.REPEAT_MODE_ALL -> "Повтор: очередь"
-                else -> "Повтор: выкл."
-            }
-            OutlinedButton(
-                onClick = {
-                    if (controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)) {
-                        val next = when (controller.repeatMode) {
-                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                            else -> Player.REPEAT_MODE_OFF
+            item(key = "queue-repeat") {
+                val repeatLabel = when (controller.repeatMode) {
+                    Player.REPEAT_MODE_ONE -> "Повтор: трек"
+                    Player.REPEAT_MODE_ALL -> "Повтор: очередь"
+                    else -> "Повтор: выкл."
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)) {
+                            val next = when (controller.repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            controller.repeatMode = next
                         }
-                        controller.repeatMode = next
-                    }
-                },
-                enabled = controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)
-            ) {
-                Icon(Icons.Default.Repeat, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(repeatLabel)
+                    },
+                    enabled = controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)
+                ) {
+                    Icon(Icons.Default.Repeat, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(repeatLabel)
+                }
             }
         }
 
         if (controller == null) {
-            Text("Подключаем плеер…", color = Muted)
+            item(key = "queue-empty") {
+                Text("Подключаем плеер…", color = Muted)
+            }
         } else if (queue.isEmpty()) {
-            Text("Очередь пока пуста. Найди музыку или запусти тест движка.", color = Muted)
+            item(key = "queue-empty") {
+                Text("Очередь пока пуста. Найди музыку или запусти тест движка.", color = Muted)
+            }
         } else {
-            queue.forEachIndexed { index, item ->
+            itemsIndexed(
+                items = queue,
+                key = { index, item -> "queue:${index}:${item.mediaId}" }
+            ) { index, item ->
                 val title = item.mediaMetadata.title?.toString()?.takeIf { it.isNotBlank() } ?: "Без названия"
                 val artist = item.mediaMetadata.artist?.toString()?.takeIf { it.isNotBlank() } ?: "Неизвестный исполнитель"
                 val selected = index == currentIndex
@@ -965,7 +976,6 @@ private fun QueueScreen(
         }
     }
 }
-
 @Composable
 private fun WaveLogo() {
     Box(
