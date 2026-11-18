@@ -500,22 +500,24 @@ private fun SourceSearchScreen(
     var groups by remember { mutableStateOf(emptyList<SourceSearchGroup>()) }
     var loading by remember { mutableStateOf(false) }
     var hasSearched by remember { mutableStateOf(false) }
+    var resultQuery by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
+    var paginationJob by remember { mutableStateOf<Job?>(null) }
     var searchGeneration by remember { mutableIntStateOf(0) }
     val loadingMore = groups.any { it.loadingMore }
 
     fun loadNextPage(group: SourceSearchGroup) {
         val token = group.nextPageToken ?: return
         if (loading || group.loadingMore) return
-        val searchQuery = query.trim()
-        if (searchQuery.isEmpty()) return
+        val searchQuery = resultQuery
+        if (searchQuery.isEmpty() || query.trim() != resultQuery) return
         val generation = searchGeneration
         groups = groups.map { current ->
             if (current.source.id == group.source.id) current.copy(loadingMore = true, message = null)
             else current
         }
-        scope.launch {
+        paginationJob = scope.launch {
             try {
                 val provider = sourceRegistry.get(group.source.id)
                     ?: throw IllegalStateException("Источник отключён")
@@ -552,7 +554,16 @@ private fun SourceSearchScreen(
         Text("Один запрос по всем подключённым каталогам", color = Muted, fontSize = 12.sp)
         OutlinedTextField(
             value = query,
-            onValueChange = { query = it },
+            onValueChange = { value ->
+                if (value != query) {
+                    query = value
+                    searchGeneration += 1
+                    searchJob?.cancel()
+                    paginationJob?.cancel()
+                    loading = false
+                    groups = groups.map { it.copy(loadingMore = false) }
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             label = { Text("Трек или исполнитель") },
             singleLine = true
@@ -564,6 +575,8 @@ private fun SourceSearchScreen(
                     searchGeneration += 1
                     val generation = searchGeneration
                     searchJob?.cancel()
+                    paginationJob?.cancel()
+                    resultQuery = searchQuery
                     groups = emptyList()
                     searchJob = scope.launch {
                         loading = true
