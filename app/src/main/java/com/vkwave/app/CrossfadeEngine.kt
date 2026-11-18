@@ -487,7 +487,11 @@ class CrossfadeEngine(context: Context) {
 
                 incoming.volume = 0f
                 incoming.play()
-                val steps = (durationMs / 40L).coerceAtLeast(1L).toInt()
+                val effectiveDurationMs = CrossfadeMath.capFadeToIncomingDuration(
+                    durationMs,
+                    incoming.duration
+                )
+                val steps = (effectiveDurationMs / 40L).coerceAtLeast(1L).toInt()
                 for (step in 0 until steps) {
                     if (incoming.playerError != null || incoming.playbackState == Player.STATE_IDLE) {
                         unavailableQueueIndexes.add(nextIndex)

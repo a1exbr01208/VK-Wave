@@ -49,6 +49,15 @@ class CrossfadeMathTest {
     }
 
     @Test
+    fun shortIncomingTrackCapsCrossfadeDuration() {
+        assertEquals(900L, CrossfadeMath.capFadeToIncomingDuration(7_000L, 900L))
+        assertEquals(2_300L, CrossfadeMath.capFadeToIncomingDuration(2_300L, 5_000L))
+        // Unknown/live durations must not collapse the fade to zero.
+        assertEquals(7_000L, CrossfadeMath.capFadeToIncomingDuration(7_000L, -1L))
+        assertEquals(1L, CrossfadeMath.capFadeToIncomingDuration(0L, 0L))
+    }
+
+    @Test
     fun fadeDurationRespectsSupportedBounds() {
         assertEquals(2_000L, CrossfadeMath.actualFadeDurationMs(9_000L, 1))
         assertEquals(15_000L, CrossfadeMath.actualFadeDurationMs(20_000L, 20))

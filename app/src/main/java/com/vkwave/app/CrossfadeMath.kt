@@ -22,9 +22,15 @@ object CrossfadeMath {
             userVolume.coerceIn(0f, 1f) *
             focusGain.coerceIn(0f, 1f)
 
-    /** Prevent a late transition from outliving the outgoing track. */
+    /** Prevent a late transition from outliving either participating track. */
     fun actualFadeDurationMs(remainingMs: Long, configuredSeconds: Int): Long {
         val configuredMs = configuredSeconds.coerceIn(2, 15) * 1_000L
         return remainingMs.coerceAtLeast(1L).coerceAtMost(configuredMs)
+    }
+
+    /** A short incoming track must not be faded for longer than it can play. */
+    fun capFadeToIncomingDuration(requestedFadeMs: Long, incomingDurationMs: Long): Long {
+        val requested = requestedFadeMs.coerceAtLeast(1L)
+        return if (incomingDurationMs > 0L) minOf(requested, incomingDurationMs) else requested
     }
 }
