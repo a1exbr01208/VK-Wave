@@ -10,6 +10,21 @@ class PlaybackQueueTest {
     private val third = WaveTrack("3", "Third", "Artist")
 
     @Test
+    fun resolvedStartIndexSkipsFailedRequestedTrackAndKeepsOriginalOrder() {
+        assertEquals(1, resolveQueueStartIndex(listOf(0, 2, 4), requestedIndex = 1))
+    }
+
+    @Test
+    fun resolvedStartIndexReturnsNullWhenNoRequestedOrLaterTrackSurvives() {
+        assertNull(resolveQueueStartIndex(listOf(0, 1), requestedIndex = 2))
+    }
+
+    @Test
+    fun resolvedStartIndexClampsNegativeRequestToFirstPlayableTrack() {
+        assertEquals(0, resolveQueueStartIndex(listOf(3, 5), requestedIndex = -1))
+    }
+
+    @Test
     fun emptyQueueHasNoCurrentTrack() {
         val queue = PlaybackQueue()
         assertEquals(-1, queue.currentIndex)
