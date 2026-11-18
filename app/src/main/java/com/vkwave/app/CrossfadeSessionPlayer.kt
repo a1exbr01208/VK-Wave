@@ -13,7 +13,6 @@ import com.google.common.util.concurrent.ListenableFuture
  * to the dual-player engine. The session follows the active ExoPlayer as a
  * crossfade completes, so metadata and position remain system-visible.
  */
-@OptIn(UnstableApi::class)
 @UnstableApi
 class CrossfadeSessionPlayer(
     initialPlayer: Player,

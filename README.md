@@ -27,6 +27,7 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - Service-coordinated audio focus and headphone-unplug handling
 - Equal-power cosine/sine crossfade, configurable from 2 to 15 seconds (default 7)
 - Incoming-track pre-buffering and gapless fallback when the next source is late
+- Failed stream candidates are skipped during automatic transitions; queue entries remain available for manual retry
 - Queue set/add/move/replace/remove operations, repeat off/all/one
 - Persisted crossfade preference
 

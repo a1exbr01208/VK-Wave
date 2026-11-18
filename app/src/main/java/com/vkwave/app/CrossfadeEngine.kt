@@ -349,6 +349,7 @@ class CrossfadeEngine(context: Context) {
                     val ready = withTimeoutOrNull(20_000L) {
                         while (isActive &&
                             incoming.playbackState != Player.STATE_READY &&
+                            incoming.playbackState != Player.STATE_ENDED &&
                             incoming.playerError == null
                         ) {
                             delay(50)
@@ -411,6 +412,7 @@ class CrossfadeEngine(context: Context) {
                 val ready = withTimeoutOrNull(20_000L) {
                     while (isActive &&
                         incoming.playbackState != Player.STATE_READY &&
+                        incoming.playbackState != Player.STATE_ENDED &&
                         incoming.playerError == null
                     ) {
                         delay(50)

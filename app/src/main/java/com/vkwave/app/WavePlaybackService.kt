@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  * lifecycle. Audio focus is centralized so overlapping ExoPlayers never
  * compete with each other for focus during a crossfade.
  */
-@OptIn(UnstableApi::class)
+@UnstableApi
 class WavePlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private var crossfadeEngine: CrossfadeEngine? = null

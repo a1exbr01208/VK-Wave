@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.QueueMusic
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -61,7 +62,7 @@ private val waveTabs = listOf(
     WaveTab("Главная", Icons.Default.Home),
     WaveTab("Поиск", Icons.Default.Search),
     WaveTab("Медиатека", Icons.Default.LibraryMusic),
-    WaveTab("Очередь", Icons.Default.QueueMusic),
+    WaveTab("Очередь", Icons.AutoMirrored.Filled.QueueMusic),
     WaveTab("Настройки", Icons.Default.Settings)
 )
 
