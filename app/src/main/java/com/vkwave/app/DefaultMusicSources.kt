@@ -12,4 +12,5 @@ fun createMusicSourceRegistry(context: Context): MusicSourceRegistry =
     MusicSourceRegistry().apply {
         register(LocalAudioSource(context))
         register(AudiusMusicSource())
+        register(JamendoMusicSource())
     }
