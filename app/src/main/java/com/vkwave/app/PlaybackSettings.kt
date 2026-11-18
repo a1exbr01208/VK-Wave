@@ -30,7 +30,6 @@ val Context.savedJamendoClientId: Flow<String?>
 
 suspend fun Context.persistJamendoClientId(clientId: String) {
     playbackSettingsDataStore.edit { preferences ->
-        if (clientId.isBlank()) preferences.remove(jamendoClientIdKey)
-        else preferences[jamendoClientIdKey] = clientId.trim()
+        preferences[jamendoClientIdKey] = clientId.trim()
     }
 }
