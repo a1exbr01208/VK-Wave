@@ -42,6 +42,7 @@ class CrossfadeSessionPlayer(
 
         val queue = engine.queueItems
         commands.add(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+        commands.add(Player.COMMAND_SET_REPEAT_MODE)
         if (queue.isNotEmpty()) {
             commands.add(Player.COMMAND_GET_TIMELINE)
             commands.add(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
@@ -58,6 +59,13 @@ class CrossfadeSessionPlayer(
         val builder = state.buildUpon()
             .setAvailableCommands(commands.build())
             .setPlaylist(playlist)
+            .setRepeatMode(
+                when (engine.repeatMode) {
+                    QueueRepeatMode.ONE -> Player.REPEAT_MODE_ONE
+                    QueueRepeatMode.ALL -> Player.REPEAT_MODE_ALL
+                    QueueRepeatMode.OFF -> Player.REPEAT_MODE_OFF
+                }
+            )
             .setVolume(engine.masterVolume)
 
         if (queue.isNotEmpty()) {
