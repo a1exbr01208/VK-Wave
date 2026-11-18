@@ -648,7 +648,7 @@ private fun SourceSearchScreen(
 
     fun loadNextPage(group: SourceSearchGroup) {
         val token = group.nextPageToken ?: return
-        if (loading || group.loadingMore) return
+        if (loading || group.loadingMore || paginationJob?.isActive == true) return
         val searchQuery = resultQuery
         if (searchQuery.isEmpty() || query.trim() != resultQuery) return
         val generation = searchGeneration
