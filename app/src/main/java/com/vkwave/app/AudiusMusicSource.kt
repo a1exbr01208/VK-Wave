@@ -99,33 +99,31 @@ class AudiusMusicSource(
     }
 }
 
-}
-
 /** Pure Audius response mapping, isolated for deterministic API contract tests. */
 internal object AudiusTrackMapper {
     fun toWaveTrack(item: JSONObject): WaveTrack? {
         val trackId = item.optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
         val title = item.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: return null
         val user = item.optJSONObject("user")
-        val artist = user?.item.optString("name")
+        val artist = user?.optString("name")
             ?.takeIf { it.isNotBlank() && it != "null" }
-            ?: user?.item.optString("handle")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: user?.optString("handle")?.takeIf { it.isNotBlank() && it != "null" }
             ?: "Неизвестный исполнитель"
         val artwork = item.optJSONObject("artwork")
-        val artworkUrl = artwork?.item.optString("480x480")
+        val artworkUrl = artwork?.optString("480x480")
             ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-            ?: artwork?.item.optString("150x150")
+            ?: artwork?.optString("150x150")
                 ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
         val streamable = item.optBoolean("is_streamable", true)
         if (!streamable) return null
 
         return WaveTrack(
-            id = "$SOURCE_ID:$trackId",
+            id = "audius:$trackId",
             title = title,
             artist = artist,
             artworkUri = artworkUrl,
-            streamUri = "$apiBaseUrl/tracks/$trackId/stream",
-            sourceId = SOURCE_ID,
+            streamUri = "https://api.audius.co/v1/tracks/$trackId/stream",
+            sourceId = "audius",
             providerTrackId = trackId
         )
     }
