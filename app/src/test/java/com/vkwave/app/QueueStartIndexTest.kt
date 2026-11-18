@@ -17,8 +17,13 @@ class QueueStartIndexTest {
     }
 
     @Test
-    fun doesNotWrapToEarlierTrackWhenNothingAfterSelectionResolved() {
-        assertNull(resolveQueueStartIndex(listOf(0, 1), 2))
+    fun fallsBackToLastEarlierPlayableTrackWhenNothingAfterSelectionResolved() {
+        assertEquals(1, resolveQueueStartIndex(listOf(0, 1), 2))
+    }
+
+    @Test
+    fun returnsNullWhenNoTracksResolved() {
+        assertNull(resolveQueueStartIndex(emptyList(), 2))
     }
 
     @Test
