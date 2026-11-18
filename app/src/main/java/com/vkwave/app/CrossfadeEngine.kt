@@ -115,7 +115,10 @@ class CrossfadeEngine(context: Context) {
         incomingGain = 0f
         applyVolumes()
 
-        if (playlist.isEmpty()) return
+        if (playlist.isEmpty()) {
+            onQueueStateChanged?.invoke()
+            return
+        }
 
         activePlayer.setMediaItem(playlist[index], startPositionMs.coerceAtLeast(0L))
         activePlayer.prepare()
@@ -123,6 +126,7 @@ class CrossfadeEngine(context: Context) {
         if (wasPlaying) activePlayer.play()
         prepareUpcoming()
         startMonitor()
+        onQueueStateChanged?.invoke()
     }
 
     fun addMediaItems(insertIndex: Int, items: List<MediaItem>) {
@@ -250,6 +254,7 @@ class CrossfadeEngine(context: Context) {
         repeatMode = mode
         players.forEach(::applyRepeatMode)
         if (transitionJob?.isActive != true) prepareUpcoming()
+        onQueueStateChanged?.invoke()
     }
 
     fun skipToNext(): Boolean {
@@ -296,6 +301,7 @@ class CrossfadeEngine(context: Context) {
         if (wasPlaying) current.play()
         prepareUpcoming()
         startMonitor()
+        onQueueStateChanged?.invoke()
         return true
     }
 
