@@ -47,10 +47,40 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-private val Ink = Color(0xFF101116)
-private val Panel = Color(0xFF1B1D25)
-private val Accent = Color(0xFF9B7BFF)
-private val Muted = Color(0xFF9699A8)
+private data class WavePalette(
+    val background: Color,
+    val surface: Color,
+    val accent: Color,
+    val muted: Color,
+    val foreground: Color
+)
+
+private val LocalWavePalette = compositionLocalOf {
+    WavePalette(
+        Color(0xFF101116), Color(0xFF1B1D25),
+        Color(0xFF9B7BFF), Color(0xFF9699A8), Color.White
+    )
+}
+
+private val Ink: Color @Composable get() = LocalWavePalette.current.background
+private val Panel: Color @Composable get() = LocalWavePalette.current.surface
+private val Accent: Color @Composable get() = LocalWavePalette.current.accent
+private val Muted: Color @Composable get() = LocalWavePalette.current.muted
+
+private fun paletteFor(theme: String): WavePalette = when (theme) {
+    "light" -> WavePalette(
+        Color(0xFFF4F4F7), Color.White, Color(0xFF7654D8),
+        Color(0xFF777783), Color(0xFF191920)
+    )
+    "glass" -> WavePalette(
+        Color(0xFF100F1B), Color(0xFF29243A), Color(0xFFC09BFF),
+        Color(0xFFB9AECF), Color(0xFFF9F6FF)
+    )
+    else -> WavePalette(
+        Color(0xFF101116), Color(0xFF1B1D25), Color(0xFF9B7BFF),
+        Color(0xFF9699A8), Color.White
+    )
+}
 
 private data class WaveTab(val title: String, val icon: ImageVector)
 private data class SourceSearchGroup(
@@ -71,6 +101,7 @@ private val waveTabs = listOf(
 class MainActivity : ComponentActivity() {
     private val mediaControllerState = mutableStateOf<MediaController?>(null)
     private val crossfadeState = mutableFloatStateOf(7f)
+    private val themeState = mutableStateOf("dark")
     private val musicSources by lazy { createMusicSourceRegistry(applicationContext) }
     private var controllerFuture: Future<MediaController>? = null
     private var saveCrossfadeJob: Job? = null
@@ -85,6 +116,9 @@ class MainActivity : ComponentActivity() {
             }
         }
         lifecycleScope.launch {
+            applicationContext.savedWaveTheme.collect { saved -> themeState.value = saved }
+        }
+        lifecycleScope.launch {
             val jamendo = musicSources.get(JamendoMusicSource.SOURCE_ID) as? JamendoMusicSource
             applicationContext.savedJamendoClientId.collect { saved ->
                 if (saved != null) jamendo?.setClientId(saved)
@@ -97,7 +131,9 @@ class MainActivity : ComponentActivity() {
                 ::updateCrossfade,
                 ::startDemoPlayback,
                 musicSources,
-                ::playSourceTracks
+                ::playSourceTracks,
+                themeState.value,
+                ::updateTheme
             )
         }
     }
@@ -203,6 +239,12 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun updateTheme(theme: String) {
+        val normalized = theme.takeIf { it in setOf("dark", "light", "glass") } ?: "dark"
+        themeState.value = normalized
+        lifecycleScope.launch { applicationContext.persistWaveTheme(normalized) }
+    }
+
     private fun updateCrossfade(seconds: Float) {
         crossfadeState.floatValue = seconds
         saveCrossfadeJob?.cancel()
@@ -246,7 +288,9 @@ fun VKWaveApp(
     onCrossfadeChange: (Float) -> Unit,
     onDemoPlayback: () -> Unit,
     sourceRegistry: MusicSourceRegistry,
-    onPlaySourceTracks: (List<WaveTrack>, Int) -> Unit
+    onPlaySourceTracks: (List<WaveTrack>, Int) -> Unit,
+    selectedTheme: String,
+    onThemeChange: (String) -> Unit
 ) {
     var tab by remember { mutableStateOf("Главная") }
     var playing by remember(controller) { mutableStateOf(controller?.isPlaying == true) }
@@ -301,9 +345,14 @@ fun VKWaveApp(
     val currentArtist = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
         ?.takeIf { it.isNotBlank() } ?: "Источник аудио пока не подключён"
 
-    MaterialTheme(colorScheme = darkColorScheme(
-        background = Ink, surface = Panel, primary = Accent,
-        onBackground = Color.White, onSurface = Color.White
+    val palette = paletteFor(selectedTheme)
+    CompositionLocalProvider(LocalWavePalette provides palette) {
+    MaterialTheme(colorScheme = if (selectedTheme == "light") lightColorScheme(
+        background = palette.background, surface = palette.surface, primary = palette.accent,
+        onBackground = palette.foreground, onSurface = palette.foreground
+    ) else darkColorScheme(
+        background = palette.background, surface = palette.surface, primary = palette.accent,
+        onBackground = palette.foreground, onSurface = palette.foreground
     )) {
         BoxWithConstraints(Modifier.fillMaxSize().background(Ink)) {
             if (maxWidth < 600.dp) {
@@ -321,7 +370,7 @@ fun VKWaveApp(
                             onPlaySourceTracks
                         )
                         "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
-                        "Настройки" -> SettingsScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
+                        "Настройки" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
                         else -> PlayerCard(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
@@ -375,7 +424,7 @@ fun VKWaveApp(
                             "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth())
-                            "Настройки" -> SettingsScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth())
+                            "Настройки" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth())
                             else -> PlayerCard(
                                 Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
                                 canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
@@ -391,6 +440,7 @@ fun VKWaveApp(
                 }
             }
         }
+    }
     }
 }
 
@@ -419,6 +469,8 @@ private suspend fun loadSourceStatusLabels(registry: MusicSourceRegistry): Map<S
 @Composable
 private fun SettingsScreen(
     sourceRegistry: MusicSourceRegistry,
+    selectedTheme: String,
+    onThemeChange: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var statuses by remember { mutableStateOf(emptyMap<String, String>()) }
@@ -455,8 +507,34 @@ private fun SettingsScreen(
         modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Настройки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Подключённые музыкальные источники", color = Muted, fontSize = 13.sp)
+        Text("Настройки", color = LocalWavePalette.current.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text("Оформление приложения", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        Surface(color = Panel, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Тема", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
+                listOf("dark" to "Тёмная", "light" to "Светлая", "glass" to "Glass").forEach { (id, title) ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                            .background(if (selectedTheme == id) Accent.copy(alpha = .16f) else Color.Transparent)
+                            .clickable { onThemeChange(id) }.padding(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(34.dp).clip(CircleShape).background(
+                            when (id) {
+                                "light" -> Color(0xFFF4F4F7)
+                                "glass" -> Color(0xFF5C438F)
+                                else -> Color(0xFF171922)
+                            }
+                        ))
+                        Spacer(Modifier.width(12.dp))
+                        Text(title, color = LocalWavePalette.current.foreground, modifier = Modifier.weight(1f))
+                        RadioButton(selected = selectedTheme == id, onClick = { onThemeChange(id) })
+                    }
+                }
+                Text("Выбор сохраняется автоматически", color = Muted, fontSize = 11.sp)
+            }
+        }
+        Text("Подключённые музыкальные источники", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Jamendo", color = Color.White, fontWeight = FontWeight.SemiBold)
