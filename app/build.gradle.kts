@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -7,7 +9,7 @@ android {
     namespace = "com.vkwave.app"
     compileSdk = 35
     defaultConfig {
-        val localProperties = java.util.Properties().apply {
+        val localProperties = Properties().apply {
             val propertiesFile = rootProject.file("local.properties")
             if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
         }
