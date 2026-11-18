@@ -53,7 +53,7 @@ class JamendoMusicSource(
             val encodedQuery = URLEncoder.encode(normalized, Charsets.UTF_8.name())
             val payload = getJson(
                 "/tracks/?client_id=${encode(clientId)}&format=json&limit=$PAGE_SIZE&offset=$offset" +
-                    "&namesearch=$encodedQuery&audioformat=mp32&imagesize=300&type=single+albumtrack"
+                    "&search=$encodedQuery&audioformat=mp32&imagesize=300&type=single+albumtrack"
             )
             val headers = payload.optJSONObject("headers")
             if (headers?.optString("status") == "error") {
@@ -78,9 +78,14 @@ class JamendoMusicSource(
         if (track.sourceId != SOURCE_ID || track.providerTrackId.isBlank()) {
             throw UnsupportedSourceTrackException("Track does not belong to Jamendo")
         }
+        val directStream = track.streamUri?.takeIf {
+            it.startsWith("https://") || it.startsWith("http://")
+        }
         return Uri.parse(
-            "$apiBaseUrl/tracks/file/?client_id=${encode(clientId)}" +
-                "&id=${encode(track.providerTrackId)}&action=stream&audioformat=mp32"
+            directStream ?: (
+                "$apiBaseUrl/tracks/file/?client_id=${encode(clientId)}" +
+                    "&id=${encode(track.providerTrackId)}&action=stream&audioformat=mp32"
+                )
         )
     }
 
@@ -129,12 +134,15 @@ internal object JamendoTrackMapper {
             .takeIf { it.isNotBlank() && it != "null" } ?: "Неизвестный исполнитель"
         val artwork = item.optString("image")
             .takeIf { it.startsWith("https://") || it.startsWith("http://") }
+        val stream = item.optString("audio")
+            .takeIf { it.startsWith("https://") || it.startsWith("http://") }
 
         return WaveTrack(
             id = "${JamendoMusicSource.SOURCE_ID}:$trackId",
             title = title,
             artist = artist,
             artworkUri = artwork,
+            streamUri = stream,
             sourceId = JamendoMusicSource.SOURCE_ID,
             providerTrackId = trackId
         )
