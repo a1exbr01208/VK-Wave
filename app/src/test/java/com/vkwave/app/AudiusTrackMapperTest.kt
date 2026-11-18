@@ -94,6 +94,16 @@ class AudiusTrackMapperTest {
     }
 
     @Test
+    fun rejectsTrackIdsThatCouldAlterTheStreamPath() {
+        listOf("../other", "track/other", "track?redirect=example", "track#fragment")
+            .forEach { id ->
+                assertNull(AudiusTrackMapper.toWaveTrack(
+                    JSONObject(mapOf("id" to id, "title" to "Unsafe"))
+                ))
+            }
+    }
+
+    @Test
     fun ignoresInvalidArtworkAndUsesFallbackArtist() {
         val json = JSONObject(
             """{"id":"track-789","title":"Untitled","user":{},"artwork":{"480x480":"javascript:bad"}}"""

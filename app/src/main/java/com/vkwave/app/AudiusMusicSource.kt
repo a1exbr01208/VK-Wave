@@ -63,8 +63,8 @@ class AudiusMusicSource(
     override suspend fun library(pageToken: String?): SourcePage = SourcePage(emptyList())
 
     override suspend fun resolvePlayback(track: WaveTrack): Uri {
-        if (track.sourceId != SOURCE_ID || track.providerTrackId.isBlank()) {
-            throw UnsupportedSourceTrackException("Track does not belong to Audius")
+        if (track.sourceId != SOURCE_ID || !isSafeAudiusTrackId(track.providerTrackId)) {
+            throw UnsupportedSourceTrackException("Track does not belong to Audius or has an invalid track ID")
         }
         return Uri.parse(audiusStreamUrl(apiBaseUrl, track.providerTrackId))
     }
@@ -105,7 +105,8 @@ internal object AudiusTrackMapper {
         item: JSONObject,
         apiBaseUrl: String = "https://api.audius.co/v1"
     ): WaveTrack? {
-        val trackId = item.optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
+        val trackId = item.optString("id")
+            .takeIf(::isSafeAudiusTrackId) ?: return null
         val title = item.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: return null
         val user = item.optJSONObject("user")
         val artist = user?.optString("name")
@@ -134,5 +135,10 @@ internal object AudiusTrackMapper {
 }
 
 
-internal fun audiusStreamUrl(apiBaseUrl: String, trackId: String): String =
-    "${apiBaseUrl.trimEnd('/')}/tracks/$trackId/stream"
+private fun isSafeAudiusTrackId(value: String): Boolean =
+    value.isNotBlank() && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+
+internal fun audiusStreamUrl(apiBaseUrl: String, trackId: String): String {
+    require(isSafeAudiusTrackId(trackId)) { "Invalid Audius track ID" }
+    return "${apiBaseUrl.trimEnd('/')}/tracks/$trackId/stream"
+}
