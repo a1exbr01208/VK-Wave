@@ -25,6 +25,40 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun automaticNextSkipsUnavailableItemsAndPreservesOrder() {
+        assertEquals(
+            listOf(3, 4),
+            nextPlayableQueueIndexes(5, 1, QueueRepeatMode.OFF, setOf(2))
+        )
+    }
+
+    @Test
+    fun repeatAllWrapsToEarlierAvailableItems() {
+        assertEquals(
+            listOf(0, 1),
+            nextPlayableQueueIndexes(4, 3, QueueRepeatMode.ALL, setOf(2))
+        )
+    }
+
+    @Test
+    fun repeatOffDoesNotWrapAndRepeatOneDoesNotAdvanceQueue() {
+        assertEquals(emptyList<Int>(), nextPlayableQueueIndexes(3, 2, QueueRepeatMode.OFF))
+        assertEquals(emptyList<Int>(), nextPlayableQueueIndexes(3, 1, QueueRepeatMode.ONE))
+    }
+
+    @Test
+    fun previousSkipsUnavailableItemsAndWrapsOnlyInRepeatAll() {
+        assertEquals(
+            listOf(0),
+            previousPlayableQueueIndexes(4, 3, QueueRepeatMode.OFF, setOf(1, 2))
+        )
+        assertEquals(
+            listOf(0, 3),
+            previousPlayableQueueIndexes(4, 1, QueueRepeatMode.ALL, setOf(2))
+        )
+    }
+
+    @Test
     fun emptyQueueHasNoCurrentTrack() {
         val queue = PlaybackQueue()
         assertEquals(-1, queue.currentIndex)
