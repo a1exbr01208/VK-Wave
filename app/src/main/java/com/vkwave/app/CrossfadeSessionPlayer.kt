@@ -170,6 +170,11 @@ class CrossfadeSessionPlayer(
         return Futures.immediateVoidFuture()
     }
 
+    /** Notify MediaSession listeners when engine-only queue availability changes. */
+    fun refreshEngineState() {
+        invalidateState()
+    }
+
     override fun handleRelease(): ListenableFuture<*> {
         // The service owns the engine and releases it in onDestroy().
         return Futures.immediateVoidFuture()
