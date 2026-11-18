@@ -16,11 +16,21 @@ import java.net.URLEncoder
  * JAMENDO_CLIENT_ID; never commit credentials or the local properties file.
  */
 class JamendoMusicSource(
-    private val clientId: String = BuildConfig.JAMENDO_CLIENT_ID,
+    clientId: String = BuildConfig.JAMENDO_CLIENT_ID,
     private val apiBaseUrl: String = API_BASE_URL,
     private val connectTimeoutMs: Int = 12_000,
     private val readTimeoutMs: Int = 20_000
 ) : MusicSource {
+
+    @Volatile
+    private var clientId: String = clientId
+
+    val configuredClientId: String
+        get() = clientId
+
+    fun setClientId(value: String) {
+        clientId = value.trim()
+    }
 
     override val descriptor = SourceDescriptor(
         id = SOURCE_ID,
