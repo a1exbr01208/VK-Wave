@@ -28,6 +28,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -588,23 +590,27 @@ private fun SourceLibraryScreen(
         else message = "Нужно разрешить доступ к аудиофайлам"
     }
 
-    Column(
-        modifier.verticalScroll(rememberScrollState()),
+    LazyColumn(
+        modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Медиатека устройства", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text(message, color = Muted, fontSize = 12.sp)
-        Button(
-            onClick = {
-                if (androidx.core.content.ContextCompat.checkSelfPermission(context, permission) ==
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-                ) loadLibrary() else permissionLauncher.launch(permission)
-            },
-            enabled = !loading
-        ) {
-            Text(if (loading) "Загрузка…" else "Разрешить доступ / обновить")
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Медиатека устройства", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text(message, color = Muted, fontSize = 12.sp)
+                Button(
+                    onClick = {
+                        if (androidx.core.content.ContextCompat.checkSelfPermission(context, permission) ==
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) loadLibrary() else permissionLauncher.launch(permission)
+                    },
+                    enabled = !loading
+                ) {
+                    Text(if (loading) "Загрузка…" else "Разрешить доступ / обновить")
+                }
+            }
         }
-        tracks.forEachIndexed { index, track ->
+        itemsIndexed(tracks, key = { _, track -> track.id }) { index, track ->
             Surface(
                 color = Panel,
                 shape = RoundedCornerShape(14.dp),
