@@ -55,6 +55,7 @@ class CrossfadeEngine(context: Context) {
     private var incomingGain = 0f
 
     var onActivePlayerChanged: ((ExoPlayer) -> Unit)? = null
+    var onQueueStateChanged: (() -> Unit)? = null
 
     var crossfadeSeconds: Int = 7
         set(value) { field = value.coerceIn(2, 15) }
@@ -358,6 +359,7 @@ class CrossfadeEngine(context: Context) {
 
                     if (!ready) {
                         unavailableQueueIndexes.add(candidate)
+                        onQueueStateChanged?.invoke()
                         incoming.stop()
                         incoming.clearMediaItems()
                         continue
@@ -419,6 +421,7 @@ class CrossfadeEngine(context: Context) {
 
                 if (!ready) {
                     unavailableQueueIndexes.add(nextIndex)
+                    onQueueStateChanged?.invoke()
                     incoming.stop()
                     incoming.clearMediaItems()
                     prepareUpcoming()
@@ -431,6 +434,7 @@ class CrossfadeEngine(context: Context) {
                 for (step in 0 until steps) {
                     if (incoming.playerError != null || incoming.playbackState == Player.STATE_IDLE) {
                         unavailableQueueIndexes.add(nextIndex)
+                        onQueueStateChanged?.invoke()
                         incoming.stop()
                         incoming.clearMediaItems()
                         outgoingGain = 1f
