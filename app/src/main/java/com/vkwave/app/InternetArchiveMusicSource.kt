@@ -1,6 +1,7 @@
 package com.vkwave.app
 
 import android.net.Uri
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -73,12 +74,16 @@ class InternetArchiveMusicSource(
                             val identifier = doc.optString("identifier")
                                 .takeIf { it.isNotBlank() && it != "null" }
                                 ?: return@withPermit null
-                            runCatching {
+                            try {
                                 val metadataPayload = getJson("/metadata/${encodePathSegment(identifier)}")
                                 val metadata = metadataPayload.optJSONObject("metadata") ?: JSONObject()
                                 val files = metadataPayload.optJSONArray("files") ?: JSONArray()
                                 InternetArchiveTrackMapper.toWaveTrack(identifier, metadata, files, baseUrl)
-                            }.getOrNull()
+                            } catch (cancelled: CancellationException) {
+                                throw cancelled
+                            } catch (_: Exception) {
+                                null
+                            }
                         }
                     }
                 }.awaitAll().filterNotNull().distinctBy { it.id }
