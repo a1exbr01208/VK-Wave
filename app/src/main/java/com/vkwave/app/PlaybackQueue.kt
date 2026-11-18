@@ -80,7 +80,9 @@ class PlaybackQueue {
 
     fun next(): WaveTrack? {
         if (items.isEmpty() || currentIndex < 0) return null
-        if (repeatMode == QueueRepeatMode.ONE) return current
+        if (repeatMode == QueueRepeatMode.ONE ||
+            (repeatMode == QueueRepeatMode.ALL && items.size == 1)
+        ) return current
         val target = nextPlayableQueueIndexes(items.size, currentIndex, repeatMode).firstOrNull()
             ?: return null
         currentIndex = target
