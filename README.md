@@ -38,9 +38,9 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - `MediaItemFactory` converts resolved tracks into the common Media3 queue format
 - Capability and connection-state models let the UI adapt to search, library, authentication and permissions
 - `LocalAudioSource` reads the device's indexed music through Android MediaStore and resolves local content URIs
-- `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs
+- `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs; no user login is required for the initial public endpoints
 - `InternetArchiveMusicSource` searches public audio items and exposes only recordings marked Public Domain or CC0; it checks item metadata and selects a supported audio file before playback
-- `JamendoMusicSource` uses the official Jamendo API v3 for independent-music search and playback redirects; configure `JAMENDO_CLIENT_ID` in the local `local.properties` file
+- `JamendoMusicSource` uses the official Jamendo API v3 for independent-music search and playback redirects; enter its public Client ID in the in-app Settings screen or provide `JAMENDO_CLIENT_ID` in local `local.properties`
 - Search now runs one query concurrently across every registered provider with search capability and displays results grouped by source
 - Local audio requests Android audio-library permission at runtime and exposes a browsable device library
 
@@ -55,8 +55,9 @@ No provider is allowed to inject undocumented endpoints or bypass account protec
 
 ## Not implemented yet
 - SoundCloud OAuth / app credentials, if access is granted
-- Physical-device playback verification
-- Internet Archive live API and streaming verification on a physical Android device
+- Physical-device playback verification for Audius and Internet Archive streams
+- Jamendo live search and stream verification after a valid Client ID is configured
+- Real provider authentication and personal-library features where supported by an official API
 
 The **Тест движка** action generates two original synthetic WAV tones in the app cache. No copyrighted sample audio is bundled.
 
