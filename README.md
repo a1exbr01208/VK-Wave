@@ -39,6 +39,7 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - Capability and connection-state models let the UI adapt to search, library, authentication and permissions
 - `LocalAudioSource` reads the device's indexed music through Android MediaStore and resolves local content URIs
 - `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs
+- `InternetArchiveMusicSource` searches public audio items and exposes only recordings marked Public Domain or CC0; it checks item metadata and selects a supported audio file before playback
 - `JamendoMusicSource` uses the official Jamendo API v3 for independent-music search and playback redirects; configure `JAMENDO_CLIENT_ID` in the local `local.properties` file
 - Search now runs one query concurrently across every registered provider with search capability and displays results grouped by source
 - Local audio requests Android audio-library permission at runtime and exposes a browsable device library
@@ -55,6 +56,7 @@ No provider is allowed to inject undocumented endpoints or bypass account protec
 ## Not implemented yet
 - SoundCloud OAuth / app credentials, if access is granted
 - Physical-device playback verification
+- Internet Archive live API and streaming verification on a physical Android device
 
 The **Тест движка** action generates two original synthetic WAV tones in the app cache. No copyrighted sample audio is bundled.
 
