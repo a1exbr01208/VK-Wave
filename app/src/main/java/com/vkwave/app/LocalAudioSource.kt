@@ -8,6 +8,8 @@ import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Device music provider. It reads audio indexed by Android MediaStore and plays
@@ -30,21 +32,23 @@ class LocalAudioSource(context: Context) : MusicSource {
         if (hasAudioPermission()) SourceConnectionState.Available
         else SourceConnectionState.NeedsPermission
 
-    override suspend fun search(query: String, pageToken: String?): SourcePage {
-        requireAudioPermission()
-        val normalized = query.trim()
-        if (normalized.isEmpty()) return SourcePage(emptyList())
-        val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND (" +
-            "${MediaStore.Audio.Media.TITLE} LIKE ? OR " +
-            "${MediaStore.Audio.Media.ARTIST} LIKE ?)"
-        val pattern = "%$normalized%"
-        return SourcePage(queryTracks(selection, arrayOf(pattern, pattern)))
-    }
+    override suspend fun search(query: String, pageToken: String?): SourcePage =
+        withContext(Dispatchers.IO) {
+            requireAudioPermission()
+            val normalized = query.trim()
+            if (normalized.isEmpty()) return@withContext SourcePage(emptyList())
+            val selection = "${MediaStore.Audio.Media.IS_MUSIC} != 0 AND (" +
+                "${MediaStore.Audio.Media.TITLE} LIKE ? OR " +
+                "${MediaStore.Audio.Media.ARTIST} LIKE ?)"
+            val pattern = "%$normalized%"
+            SourcePage(queryTracks(selection, arrayOf(pattern, pattern)))
+        }
 
-    override suspend fun library(pageToken: String?): SourcePage {
-        requireAudioPermission()
-        return SourcePage(queryTracks("${MediaStore.Audio.Media.IS_MUSIC} != 0", null))
-    }
+    override suspend fun library(pageToken: String?): SourcePage =
+        withContext(Dispatchers.IO) {
+            requireAudioPermission()
+            SourcePage(queryTracks("${MediaStore.Audio.Media.IS_MUSIC} != 0", null))
+        }
 
     override suspend fun resolvePlayback(track: WaveTrack): Uri {
         if (track.sourceId != SOURCE_ID || track.streamUri.isNullOrBlank()) {
