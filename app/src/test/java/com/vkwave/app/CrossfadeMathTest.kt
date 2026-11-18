@@ -31,6 +31,18 @@ class CrossfadeMathTest {
     }
 
     @Test
+    fun systemDuckingScalesButDoesNotReplaceUserVolume() {
+        assertEquals(0.15f, CrossfadeMath.outputVolume(1f, 0.75f, 0.2f), 0.0001f)
+        assertEquals(0.75f, CrossfadeMath.outputVolume(1f, 0.75f, 1f), 0.0001f)
+    }
+
+    @Test
+    fun outputVolumeClampsAllInputs() {
+        assertEquals(0f, CrossfadeMath.outputVolume(-1f, 0.8f, 1f), 0.0001f)
+        assertEquals(0.8f, CrossfadeMath.outputVolume(2f, 0.8f, 2f), 0.0001f)
+    }
+
+    @Test
     fun lateFadeNeverExceedsRemainingTrackTime() {
         assertEquals(2_300L, CrossfadeMath.actualFadeDurationMs(2_300L, 7))
         assertEquals(7_000L, CrossfadeMath.actualFadeDurationMs(9_000L, 7))
