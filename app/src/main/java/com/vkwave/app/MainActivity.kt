@@ -368,7 +368,14 @@ private fun SourceLibraryScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Text(track.artist, color = Muted, fontSize = 12.sp)
-                    Text("▶  Слушать", color = @Composable
+                    Text("▶  Слушать", color = Accent, fontSize = 11.sp)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun SourceSearchScreen(
     sourceRegistry: MusicSourceRegistry,
     modifier: Modifier = Modifier,
@@ -389,15 +396,14 @@ private fun SourceSearchScreen(
         if (loading || group.loadingMore) return
         val searchQuery = query.trim()
         if (searchQuery.isEmpty()) return
-        groups = groups.map {
-            if (it.source.id == group.source.id) it.copy(loadingMore = true, message = null) else it
+        groups = groups.map { current ->
+            if (current.source.id == group.source.id) current.copy(loadingMore = true, message = null)
+            else current
         }
         scope.launch {
-            val provider = sourceRegistry.get(group.source.id)
             try {
-                if (provider == null) {
-                    throw IllegalStateException("Источник отключён")
-                }
+                val provider = sourceRegistry.get(group.source.id)
+                    ?: throw IllegalStateException("Источник отключён")
                 val page = provider.search(searchQuery, token)
                 groups = groups.map { current ->
                     if (current.source.id != group.source.id) current
@@ -410,12 +416,10 @@ private fun SourceSearchScreen(
                 }
             } catch (error: Exception) {
                 groups = groups.map { current ->
-                    if (current.source.id == group.source.id) {
-                        current.copy(
-                            loadingMore = false,
-                            message = error.message ?: "Не удалось загрузить следующую страницу"
-                        )
-                    } else current
+                    if (current.source.id == group.source.id) current.copy(
+                        loadingMore = false,
+                        message = error.message ?: "Не удалось загрузить следующую страницу"
+                    ) else current
                 }
             }
         }
@@ -447,9 +451,7 @@ private fun SourceSearchScreen(
                                 sources.map { descriptor ->
                                     async {
                                         val provider = sourceRegistry.get(descriptor.id)
-                                            ?: return@async SourceSearchGroup(
-                                                descriptor, message = "Источник отключён"
-                                            )
+                                            ?: return@async SourceSearchGroup(descriptor, message = "Источник отключён")
                                         try {
                                             when (val state = provider.connectionState()) {
                                                 SourceConnectionState.Available -> {
@@ -470,10 +472,7 @@ private fun SourceSearchScreen(
                                                     SourceSearchGroup(descriptor, message = state.reason)
                                             }
                                         } catch (error: Exception) {
-                                            SourceSearchGroup(
-                                                descriptor,
-                                                message = error.message ?: "Ошибка поиска"
-                                            )
+                                            SourceSearchGroup(descriptor, message = error.message ?: "Ошибка поиска")
                                         }
                                     }
                                 }.awaitAll()
@@ -490,9 +489,7 @@ private fun SourceSearchScreen(
             Text(if (loading) "Ищем во всех каталогах…" else "Искать везде")
         }
 
-        if (loading) {
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-        }
+        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
         if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
             Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
         }
@@ -509,16 +506,12 @@ private fun SourceSearchScreen(
                         Text("${group.tracks.size} треков", color = Muted, fontSize = 11.sp)
                     }
                 }
-                group.message?.let {
-                    Text(it, color = Muted, fontSize = 12.sp)
-                }
+                group.message?.let { Text(it, color = Muted, fontSize = 12.sp) }
                 group.tracks.forEachIndexed { index, track ->
                     Surface(
                         color = Panel,
                         shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().clickable {
-                            onPlayTracks(group.tracks, index)
-                        }
+                        modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(group.tracks, index) }
                     ) {
                         Row(
                             Modifier.padding(14.dp).fillMaxWidth(),
@@ -540,13 +533,6 @@ private fun SourceSearchScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (group.loadingMore) "Загружаем…" else "Ещё результаты")
-                    }
-                }
-            }
-        }
-    }
-}
-   }
                     }
                 }
             }
