@@ -1,6 +1,8 @@
 package com.vkwave.app
 
 import android.os.Bundle
+import android.Manifest
+import android.os.Build
 import android.content.ComponentName
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -14,6 +16,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -205,12 +209,29 @@ fun VKWaveApp(
                 Column(Modifier.fillMaxSize()) {
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
                     if (tab == "Поиск") {
-                        SourceSearchScreen(
-                            sourceRegistry,
-                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                            onPlaySourceTracks
-                        )
-                    } else PlayerCard(
+                        when (tab) {
+                            "Поиск" -> SourceSearchScreen(
+                                sourceRegistry,
+                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                                onPlaySourceTracks
+                            )
+                            "Медиатека" -> SourceLibraryScreen(
+                                sourceRegistry,
+                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                                onPlaySourceTracks
+                            )
+                            else -> PlayerCard(
+                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                                currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
+                                { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
+                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
+                                { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
+                                onDemoPlayback
+                            )
+                        }
+                    /* Player surface is selected above. */
+                    if (false) PlayerCard(
                         Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                         currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                         { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
@@ -257,23 +278,97 @@ fun VKWaveApp(
                     Column(Modifier.fillMaxSize().padding(end = 24.dp, top = 24.dp, bottom = 20.dp)) {
                         WaveHeader(tab)
                         Spacer(Modifier.height(20.dp))
-                        if (tab == "Поиск") {
-                            SourceSearchScreen(
-                                sourceRegistry,
-                                Modifier.weight(1f).fillMaxWidth(),
-                                onPlaySourceTracks
+                        when (tab) {
+                            "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
+                            "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
+                            else -> PlayerCard(
+                                Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
+                                canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
+                                { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
+                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
+                                { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
+                                onDemoPlayback
                             )
-                        } else PlayerCard(
-                            Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
-                            canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
-                            { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
-                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
-                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
-                            { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
-                            onDemoPlayback
-                        )
+                        }
                         CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SourceLibraryScreen(
+    sourceRegistry: MusicSourceRegistry,
+    modifier: Modifier = Modifier,
+    onPlayTracks: (List<WaveTrack>, Int) -> Unit
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val source = remember(sourceRegistry) { sourceRegistry.get(LocalAudioSource.SOURCE_ID) }
+    var tracks by remember { mutableStateOf(emptyList<WaveTrack>()) }
+    var loading by remember { mutableStateOf(false) }
+    var message by remember { mutableStateOf("Музыка, сохранённая на этом устройстве") }
+    val scope = rememberCoroutineScope()
+    val permission = if (Build.VERSION.SDK_INT >= 33) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+    fun loadLibrary() {
+        val provider = source ?: return
+        scope.launch {
+            loading = true
+            try {
+                tracks = provider.library().tracks
+                message = if (tracks.isEmpty()) "На устройстве пока не найдено музыкальных файлов" else "Найдено файлов: \${tracks.size}"
+            } catch (error: Exception) {
+                message = error.message ?: "Не удалось прочитать медиатеку"
+            } finally {
+                loading = false
+            }
+        }
+    }
+
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) loadLibrary() else message = "Без разрешения Android не покажет локальную музыку"
+    }
+
+    LaunchedEffect(source) {
+        if (source?.connectionState() == SourceConnectionState.Available) loadLibrary()
+        else message = "Нужно разрешить доступ к аудиофайлам"
+    }
+
+    Column(
+        modifier.verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Медиатека устройства", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Text(message, color = Muted, fontSize = 12.sp)
+        Button(
+            onClick = {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(context, permission) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) loadLibrary() else permissionLauncher.launch(permission)
+            },
+            enabled = !loading
+        ) {
+            Text(if (loading) "Загрузка…" else "Разрешить доступ / обновить")
+        }
+        tracks.forEachIndexed { index, track ->
+            Surface(
+                color = Panel,
+                shape = RoundedCornerShape(14.dp),
+                modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(tracks, index) }
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(track.artist, color = Muted, fontSize = 12.sp)
+                    Text("▶  Слушать", color = Accent, fontSize = 11.sp)
                 }
             }
         }
