@@ -16,6 +16,12 @@ object CrossfadeMath {
         return sin(angle).toFloat()
     }
 
+    /** Combines track fade, user volume and temporary system audio-focus ducking. */
+    fun outputVolume(deckGain: Float, userVolume: Float, focusGain: Float): Float =
+        deckGain.coerceIn(0f, 1f) *
+            userVolume.coerceIn(0f, 1f) *
+            focusGain.coerceIn(0f, 1f)
+
     /** Prevent a late transition from outliving the outgoing track. */
     fun actualFadeDurationMs(remainingMs: Long, configuredSeconds: Int): Long {
         val configuredMs = configuredSeconds.coerceIn(2, 15) * 1_000L
