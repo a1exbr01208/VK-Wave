@@ -383,7 +383,7 @@ fun VKWaveApp(
                         )
                     }
                     CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
-                    NavigationBar(containerColor = Panel, contentColor = Color.White) {
+                    NavigationBar(containerColor = Panel, contentColor = LocalWavePalette.current.foreground) {
                         waveTabs.forEach { item ->
                             NavigationBarItem(
                                 selected = tab == item.title,
@@ -537,7 +537,7 @@ private fun SettingsScreen(
         Text("Подключённые музыкальные источники", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Jamendo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text("Jamendo", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
                 Text(
                     "Необязательный публичный Client ID из Jamendo Developer Portal. Он нужен только для поиска и потока Jamendo.",
                     color = Muted,
@@ -604,7 +604,7 @@ private fun SettingsScreen(
                     Modifier.padding(14.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Text(descriptor.displayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(descriptor.displayName, color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
                     Text(statuses[descriptor.id] ?: "Проверяем…", color = Muted, fontSize = 12.sp)
                     Text(
                         capabilities.joinToString(" · ").ifBlank { "Возможности не заявлены" },
@@ -674,7 +674,7 @@ private fun SourceLibraryScreen(
     ) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Медиатека устройства", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Медиатека устройства", color = LocalWavePalette.current.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text(message, color = Muted, fontSize = 12.sp)
                 Button(
                     onClick = {
@@ -695,7 +695,7 @@ private fun SourceLibraryScreen(
                 modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(tracks, index) }
             ) {
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text(track.title, color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
                     Text(track.artist, color = Muted, fontSize = 12.sp)
                     Text("▶  Слушать", color = Accent, fontSize = 11.sp)
                 }
@@ -769,7 +769,7 @@ private fun SourceSearchScreen(
     ) {
         item(key = "search-title") {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Поиск музыки", color = LocalWavePalette.current.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 Text("Один запрос по всем подключённым каталогам", color = Muted, fontSize = 12.sp)
                 OutlinedTextField(
                     value = query,
@@ -863,7 +863,7 @@ private fun SourceSearchScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(group.source.displayName, color = Color.White, fontWeight = FontWeight.Bold)
+                    Text(group.source.displayName, color = LocalWavePalette.current.foreground, fontWeight = FontWeight.Bold)
                     if (group.tracks.isNotEmpty()) {
                         Text("${group.tracks.size} треков", color = Muted, fontSize = 11.sp)
                     }
@@ -951,7 +951,7 @@ private fun QueueScreen(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Column {
-                    Text("Очередь воспроизведения", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text("Очередь воспроизведения", color = LocalWavePalette.current.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Text("${queue.size} треков", color = Muted, fontSize = 12.sp)
                 }
                 TextButton(
@@ -1027,7 +1027,7 @@ private fun QueueScreen(
                             tint = if (selected) Accent else Muted
                         )
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                            Text(title, color = Color.White, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                            Text(title, color = LocalWavePalette.current.foreground, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
                             Text(artist, color = Muted, fontSize = 12.sp)
                         }
                         IconButton(
@@ -1069,9 +1069,9 @@ private fun WaveLogo() {
 private fun WaveHeader(tab: String, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("WAVE PLAYER", color = Color.White, fontSize = 12.sp,
+            Text("WAVE PLAYER", color = LocalWavePalette.current.foreground, fontSize = 12.sp,
                 letterSpacing = 3.sp, fontWeight = FontWeight.Bold)
-            Text(tab, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
+            Text(tab, color = LocalWavePalette.current.foreground, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }
         Surface(color = Panel, shape = CircleShape) {
             Row(Modifier.clickable { }.padding(horizontal = 12.dp, vertical = 9.dp),
@@ -1189,7 +1189,7 @@ private fun CrossfadeCard(value: Float, onValueChange: (Float) -> Unit, modifier
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Плавный переход", color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Text("Плавный переход", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
                     Text("Наложение двух треков", color = Muted, fontSize = 12.sp)
                 }
                 Text(value.toInt().toString() + " сек.", color = Accent, fontWeight = FontWeight.Bold)
