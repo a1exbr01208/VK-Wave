@@ -37,7 +37,7 @@ class WavePlaybackService : MediaSessionService() {
                 resumeOnFocusGain = false
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
-                resumeOnFocusGain = engine.isPlaying
+                resumeOnFocusGain = engine.playWhenReady
                 engine.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
