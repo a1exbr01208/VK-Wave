@@ -53,10 +53,19 @@ class CrossfadeSessionPlayer(
             commands.remove(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         }
 
+        val currentDurationMs = engine.activePlayer.duration
         val playlist = queue.mapIndexed { index, mediaItem ->
-            SimpleBasePlayer.MediaItemData.Builder("$index:${mediaItem.mediaId}")
+            val itemBuilder = SimpleBasePlayer.MediaItemData.Builder("$index:${mediaItem.mediaId}")
                 .setMediaItem(mediaItem)
-                .build()
+            // The custom playlist replaces the delegate timeline. Preserve the
+            // active deck's live duration/seekability or MediaController sees
+            // TIME_UNSET and disables its seek bar.
+            if (index == engine.currentQueueIndex && currentDurationMs > 0L) {
+                itemBuilder
+                    .setDurationUs(currentDurationMs * 1_000L)
+                    .setIsSeekable(true)
+            }
+            itemBuilder.build()
         }
 
         val builder = state.buildUpon()
