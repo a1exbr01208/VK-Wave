@@ -255,6 +255,7 @@ class CrossfadeEngine(context: Context) {
         if (released) return
         masterVolume = volume.coerceIn(0f, 1f)
         applyVolumes()
+        onQueueStateChanged?.invoke()
     }
 
     /** Temporary system focus ducking must never overwrite the user's volume. */
