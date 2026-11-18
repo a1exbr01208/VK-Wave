@@ -1452,7 +1452,7 @@ private fun PlayerCard(
             )
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(formatPlaybackTime(if (isScrubbing) seekValue.toLong() else positionMs), color = Muted, fontSize = 10.sp)
-                Text(formatPlaybackTime(durationMs), color = Muted, fontSize = 10.sp)
+                Text(if (durationMs > 0L) "−${formatPlaybackTime((durationMs - positionMs).coerceAtLeast(0L))}" else "0:00", color = Muted, fontSize = 10.sp)
             }
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
