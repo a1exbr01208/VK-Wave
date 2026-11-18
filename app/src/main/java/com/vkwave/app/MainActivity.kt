@@ -11,6 +11,9 @@ import java.util.concurrent.Future
 import java.util.concurrent.Executor
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
@@ -46,6 +49,11 @@ private val Accent = Color(0xFF9B7BFF)
 private val Muted = Color(0xFF9699A8)
 
 private data class WaveTab(val title: String, val icon: ImageVector)
+private data class SourceSearchGroup(
+    val source: SourceDescriptor,
+    val tracks: List<WaveTrack> = emptyList(),
+    val message: String? = null
+)
 private val waveTabs = listOf(
     WaveTab("Главная", Icons.Default.Home),
     WaveTab("Поиск", Icons.Default.Search),
@@ -374,16 +382,10 @@ private fun SourceSearchScreen(
     val sources = remember(sourceRegistry) {
         sourceRegistry.all().filter { it.capabilities.search }
     }
-    var selectedSourceId by remember(sources) {
-        mutableStateOf(sources.firstOrNull()?.id.orEmpty())
-    }
-    val selectedSource = remember(sourceRegistry, selectedSourceId) {
-        sourceRegistry.get(selectedSourceId)
-    }
     var query by remember { mutableStateOf("") }
-    var tracks by remember { mutableStateOf(emptyList<WaveTrack>()) }
+    var groups by remember { mutableStateOf(emptyList<SourceSearchGroup>()) }
     var loading by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Выбери каталог и найди музыку") }
+    var hasSearched by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -391,24 +393,7 @@ private fun SourceSearchScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Подключённые каталоги", color = Muted, fontSize = 12.sp)
-        if (sources.isNotEmpty()) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                sources.forEach { descriptor ->
-                    FilterChip(
-                        selected = selectedSourceId == descriptor.id,
-                        onClick = {
-                            selectedSourceId = descriptor.id
-                            tracks = emptyList()
-                            message = "Источник: ${descriptor.displayName}"
-                        },
-                        label = { Text(descriptor.displayName) }
-                    )
-                }
-            }
-        } else {
-            Text("Нет источников с поддержкой поиска", color = Muted)
-        }
+        Text("Один запрос по всем подключённым каталогам", color = Muted, fontSize = 12.sp)
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -418,47 +403,98 @@ private fun SourceSearchScreen(
         )
         Button(
             onClick = {
-                val provider = selectedSource
-                if (provider != null && query.isNotBlank()) {
+                val searchQuery = query.trim()
+                if (searchQuery.isNotEmpty()) {
                     scope.launch {
                         loading = true
-                        message = "Ищем в ${provider.descriptor.displayName}…"
+                        hasSearched = true
+                        groups = emptyList()
                         try {
-                            val state = provider.connectionState()
-                            if (state is SourceConnectionState.NeedsConfiguration) {
-                                tracks = emptyList()
-                                message = state.reason
-                            } else if (state is SourceConnectionState.Unavailable) {
-                                tracks = emptyList()
-                                message = state.reason
-                            } else {
-                                tracks = provider.search(query).tracks
-                                message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: ${tracks.size}"
+                            groups = coroutineScope {
+                                sources.map { descriptor ->
+                                    async {
+                                        val provider = sourceRegistry.get(descriptor.id)
+                                            ?: return@async SourceSearchGroup(
+                                                descriptor, message = "Источник отключён"
+                                            )
+                                        try {
+                                            when (val state = provider.connectionState()) {
+                                                SourceConnectionState.Available -> {
+                                                    val page = provider.search(searchQuery)
+                                                    SourceSearchGroup(descriptor, page.tracks)
+                                                }
+                                                SourceConnectionState.NeedsPermission ->
+                                                    SourceSearchGroup(descriptor, message = "Нужно разрешение Android")
+                                                SourceConnectionState.NeedsAuthentication ->
+                                                    SourceSearchGroup(descriptor, message = "Требуется авторизация")
+                                                is SourceConnectionState.NeedsConfiguration ->
+                                                    SourceSearchGroup(descriptor, message = state.reason)
+                                                is SourceConnectionState.Unavailable ->
+                                                    SourceSearchGroup(descriptor, message = state.reason)
+                                            }
+                                        } catch (error: Exception) {
+                                            SourceSearchGroup(
+                                                descriptor,
+                                                message = error.message ?: "Ошибка поиска"
+                                            )
+                                        }
+                                    }
+                                }.awaitAll()
                             }
-                        } catch (error: Exception) {
-                            message = error.message ?: "Не удалось выполнить поиск"
-                            tracks = emptyList()
                         } finally {
                             loading = false
                         }
                     }
                 }
             },
-            enabled = !loading && query.isNotBlank() && selectedSource != null
+            enabled = !loading && query.isNotBlank() && sources.isNotEmpty(),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Text(if (loading) "Поиск…" else "Найти")
+            Text(if (loading) "Ищем во всех каталогах…" else "Искать везде")
         }
-        Text(message, color = Muted, fontSize = 12.sp)
-        tracks.forEachIndexed { index, track ->
-            Surface(
-                color = Panel,
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(tracks, index) }
-            ) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                    Text(track.artist, color = Muted, fontSize = 12.sp)
-                    Text("▶  Слушать", color = Accent, fontSize = 11.sp)
+
+        if (loading) {
+            LinearProgressIndicator(Modifier.fillMaxWidth())
+        }
+        if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
+            Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
+        }
+
+        groups.forEach { group ->
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(group.source.displayName, color = Color.White, fontWeight = FontWeight.Bold)
+                    if (group.tracks.isNotEmpty()) {
+                        Text("${group.tracks.size} треков", color = Muted, fontSize = 11.sp)
+                    }
+                }
+                group.message?.let {
+                    Text(it, color = Muted, fontSize = 12.sp)
+                }
+                group.tracks.forEachIndexed { index, track ->
+                    Surface(
+                        color = Panel,
+                        shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            onPlayTracks(group.tracks, index)
+                        }
+                    ) {
+                        Row(
+                            Modifier.padding(14.dp).fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                                Text(track.artist, color = Muted, fontSize = 12.sp)
+                            }
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Слушать", tint = Accent)
+                        }
+                    }
                 }
             }
         }
