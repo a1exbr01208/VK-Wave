@@ -52,7 +52,7 @@ class AudiusMusicSource(
             val tracks = buildList {
                 for (index in 0 until data.length()) {
                     val item = data.optJSONObject(index) ?: continue
-                    val track = item.toWaveTrackOrNull() ?: continue
+                    val track = AudiusTrackMapper.toWaveTrack(item) ?: continue
                     add(track)
                 }
             }
@@ -91,20 +91,32 @@ class AudiusMusicSource(
         }
     }
 
-    private fun JSONObject.toWaveTrackOrNull(): WaveTrack? {
-        val trackId = optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
-        val title = optString("title").takeIf { it.isNotBlank() && it != "null" } ?: return null
-        val user = optJSONObject("user")
-        val artist = user?.optString("name")
+
+    companion object {
+        const val SOURCE_ID = "audius"
+        private const val API_BASE_URL = "https://api.audius.co/v1"
+        private const val PAGE_SIZE = 20
+    }
+}
+
+}
+
+/** Pure Audius response mapping, isolated for deterministic API contract tests. */
+internal object AudiusTrackMapper {
+    fun toWaveTrack(item: JSONObject): WaveTrack? {
+        val trackId = item.optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
+        val title = item.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: return null
+        val user = item.optJSONObject("user")
+        val artist = user?.item.optString("name")
             ?.takeIf { it.isNotBlank() && it != "null" }
-            ?: user?.optString("handle")?.takeIf { it.isNotBlank() && it != "null" }
+            ?: user?.item.optString("handle")?.takeIf { it.isNotBlank() && it != "null" }
             ?: "Неизвестный исполнитель"
-        val artwork = optJSONObject("artwork")
-        val artworkUrl = artwork?.optString("480x480")
+        val artwork = item.optJSONObject("artwork")
+        val artworkUrl = artwork?.item.optString("480x480")
             ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-            ?: artwork?.optString("150x150")
+            ?: artwork?.item.optString("150x150")
                 ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
-        val streamable = optBoolean("is_streamable", true)
+        val streamable = item.optBoolean("is_streamable", true)
         if (!streamable) return null
 
         return WaveTrack(
@@ -118,9 +130,4 @@ class AudiusMusicSource(
         )
     }
 
-    companion object {
-        const val SOURCE_ID = "audius"
-        private const val API_BASE_URL = "https://api.audius.co/v1"
-        private const val PAGE_SIZE = 20
-    }
 }
