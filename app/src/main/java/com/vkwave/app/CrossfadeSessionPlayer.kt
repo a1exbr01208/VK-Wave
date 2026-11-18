@@ -2,6 +2,7 @@ package com.vkwave.app
 
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.SimpleBasePlayer
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.ForwardingSimpleBasePlayer
 import com.google.common.util.concurrent.Futures
@@ -39,10 +40,31 @@ class CrossfadeSessionPlayer(
             commands.remove(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
         }
 
-        return state.buildUpon()
+        val queue = engine.queueItems
+        commands.add(Player.COMMAND_CHANGE_MEDIA_ITEMS)
+        if (queue.isNotEmpty()) {
+            commands.add(Player.COMMAND_GET_TIMELINE)
+            commands.add(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+        } else {
+            commands.remove(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+        }
+
+        val playlist = queue.mapIndexed { index, mediaItem ->
+            SimpleBasePlayer.MediaItemData.Builder("$index:${mediaItem.mediaId}")
+                .setMediaItem(mediaItem)
+                .build()
+        }
+
+        val builder = state.buildUpon()
             .setAvailableCommands(commands.build())
+            .setPlaylist(playlist)
             .setVolume(engine.masterVolume)
-            .build()
+
+        if (queue.isNotEmpty()) {
+            builder.setCurrentMediaItemIndex(engine.currentQueueIndex)
+        }
+
+        return builder.build()
     }
 
     override fun handlePrepare(): ListenableFuture<*> {
