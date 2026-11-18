@@ -5,7 +5,8 @@ internal fun resolveQueueStartIndex(
     requestedIndex: Int
 ): Int? {
     val requested = requestedIndex.coerceAtLeast(0)
-    return resolvedOriginalIndexes.indexOfFirst { it >= requested }.takeIf { it >= 0 }
+    val nextPlayable = resolvedOriginalIndexes.indexOfFirst { it >= requested }
+    return nextPlayable.takeIf { it >= 0 } ?: resolvedOriginalIndexes.lastIndex.takeIf { it >= 0 }
 }
 
 /** Repeat behavior is independent of the provider and playback engine. */
