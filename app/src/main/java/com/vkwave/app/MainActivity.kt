@@ -371,11 +371,19 @@ private fun SourceSearchScreen(
     modifier: Modifier = Modifier,
     onPlayTracks: (List<WaveTrack>, Int) -> Unit
 ) {
-    val source = remember(sourceRegistry) { sourceRegistry.get(AudiusMusicSource.SOURCE_ID) }
+    val sources = remember(sourceRegistry) {
+        sourceRegistry.all().filter { it.capabilities.search }
+    }
+    var selectedSourceId by remember(sources) {
+        mutableStateOf(sources.firstOrNull()?.id.orEmpty())
+    }
+    val selectedSource = remember(sourceRegistry, selectedSourceId) {
+        sourceRegistry.get(selectedSourceId)
+    }
     var query by remember { mutableStateOf("") }
     var tracks by remember { mutableStateOf(emptyList<WaveTrack>()) }
     var loading by remember { mutableStateOf(false) }
-    var message by remember { mutableStateOf("Ищи независимых исполнителей и треки в каталоге Audius") }
+    var message by remember { mutableStateOf("Выбери каталог и найди музыку") }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -383,7 +391,24 @@ private fun SourceSearchScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Источник: Audius · открытый музыкальный каталог", color = Muted, fontSize = 12.sp)
+        Text("Подключённые каталоги", color = Muted, fontSize = 12.sp)
+        if (sources.isNotEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                sources.forEach { descriptor ->
+                    FilterChip(
+                        selected = selectedSourceId == descriptor.id,
+                        onClick = {
+                            selectedSourceId = descriptor.id
+                            tracks = emptyList()
+                            message = "Источник: ${descriptor.displayName}"
+                        },
+                        label = { Text(descriptor.displayName) }
+                    )
+                }
+            }
+        } else {
+            Text("Нет источников с поддержкой поиска", color = Muted)
+        }
         OutlinedTextField(
             value = query,
             onValueChange = { query = it },
@@ -393,16 +418,25 @@ private fun SourceSearchScreen(
         )
         Button(
             onClick = {
-                val provider = source
+                val provider = selectedSource
                 if (provider != null && query.isNotBlank()) {
                     scope.launch {
                         loading = true
-                        message = "Ищем треки…"
+                        message = "Ищем в ${provider.descriptor.displayName}…"
                         try {
-                            tracks = provider.search(query).tracks
-                            message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: ${tracks.size}"
+                            val state = provider.connectionState()
+                            if (state is SourceConnectionState.NeedsConfiguration) {
+                                tracks = emptyList()
+                                message = state.reason
+                            } else if (state is SourceConnectionState.Unavailable) {
+                                tracks = emptyList()
+                                message = state.reason
+                            } else {
+                                tracks = provider.search(query).tracks
+                                message = if (tracks.isEmpty()) "Ничего не найдено" else "Найдено треков: ${tracks.size}"
+                            }
                         } catch (error: Exception) {
-                            message = error.message ?: "Не удалось связаться с Audius"
+                            message = error.message ?: "Не удалось выполнить поиск"
                             tracks = emptyList()
                         } finally {
                             loading = false
@@ -410,7 +444,7 @@ private fun SourceSearchScreen(
                     }
                 }
             },
-            enabled = !loading && query.isNotBlank() && source != null
+            enabled = !loading && query.isNotBlank() && selectedSource != null
         ) {
             Text(if (loading) "Поиск…" else "Найти")
         }
