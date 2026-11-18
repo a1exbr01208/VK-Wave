@@ -102,7 +102,16 @@ class PlaybackQueueTest {
             repeatMode = QueueRepeatMode.ALL
         }
         assertEquals(first, queue.next())
+        assertEquals(first, queue.previous())
         assertEquals(0, queue.currentIndex)
+    }
+
+    @Test
+    fun singleItemRepeatAllExposesManualNextAndPrevious() {
+        assertEquals(listOf(0), nextPlayableQueueIndexes(1, 0, QueueRepeatMode.ALL))
+        assertEquals(listOf(0), previousPlayableQueueIndexes(1, 0, QueueRepeatMode.ALL))
+        assertEquals(emptyList<Int>(), nextPlayableQueueIndexes(1, 0, QueueRepeatMode.OFF))
+        assertEquals(emptyList<Int>(), previousPlayableQueueIndexes(1, 0, QueueRepeatMode.OFF))
     }
 
     @Test
