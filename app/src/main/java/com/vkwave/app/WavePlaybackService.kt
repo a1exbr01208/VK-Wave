@@ -32,7 +32,7 @@ class WavePlaybackService : MediaSessionService() {
         val engine = crossfadeEngine ?: return@OnAudioFocusChangeListener
         when (change) {
             AudioManager.AUDIOFOCUS_GAIN -> {
-                engine.setMasterVolume(1f)
+                engine.setFocusGain(1f)
                 if (resumeOnFocusGain) engine.play()
                 resumeOnFocusGain = false
             }
@@ -41,10 +41,11 @@ class WavePlaybackService : MediaSessionService() {
                 engine.pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
-                engine.setMasterVolume(0.2f)
+                engine.setFocusGain(0.2f)
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
                 resumeOnFocusGain = false
+                engine.setFocusGain(1f)
                 engine.pause()
                 abandonAudioFocus()
             }
@@ -112,6 +113,7 @@ class WavePlaybackService : MediaSessionService() {
 
     private fun abandonAudioFocus() {
         resumeOnFocusGain = false
+        crossfadeEngine?.setFocusGain(1f)
         val request = audioFocusRequest ?: return
         audioManager?.abandonAudioFocusRequest(request)
         audioFocusRequest = null
