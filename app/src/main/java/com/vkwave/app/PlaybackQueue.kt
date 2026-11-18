@@ -1,5 +1,13 @@
 package com.vkwave.app
 
+internal fun resolveQueueStartIndex(
+    resolvedOriginalIndexes: List<Int>,
+    requestedIndex: Int
+): Int? {
+    val requested = requestedIndex.coerceAtLeast(0)
+    return resolvedOriginalIndexes.indexOfFirst { it >= requested }.takeIf { it >= 0 }
+}
+
 /** Repeat behavior is independent of the provider and playback engine. */
 enum class QueueRepeatMode {
     OFF,
