@@ -87,6 +87,12 @@ class MainActivity : ComponentActivity() {
                 crossfadeState.floatValue = saved.toFloat()
             }
         }
+        lifecycleScope.launch {
+            val jamendo = musicSources.get(JamendoMusicSource.SOURCE_ID) as? JamendoMusicSource
+            applicationContext.savedJamendoClientId.collect { saved ->
+                if (saved != null) jamendo?.setClientId(saved)
+            }
+        }
         setContent {
             VKWaveApp(
                 mediaControllerState.value,
