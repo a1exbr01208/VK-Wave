@@ -86,6 +86,10 @@ class CrossfadeEngine(context: Context) {
     val isPlaying: Boolean
         get() = !released && activePlayer.isPlaying
 
+    /** True when playback is requested, including while the active deck buffers. */
+    val playWhenReady: Boolean
+        get() = !released && activePlayer.playWhenReady
+
     val canSkipNext: Boolean
         get() = nextPlayableQueueIndexes(
             playlist.size, index, repeatMode, unavailableQueueIndexes
