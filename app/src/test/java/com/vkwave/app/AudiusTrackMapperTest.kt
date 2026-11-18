@@ -37,6 +37,24 @@ class AudiusTrackMapperTest {
     }
 
     @Test
+    fun usesConfiguredApiBaseUrlForStreamEndpoint() {
+        val json = JSONObject(
+            """{"id":"track-custom","title":"Custom endpoint"}"""
+        )
+
+        val track = AudiusTrackMapper.toWaveTrack(
+            json,
+            apiBaseUrl = "https://gateway.example/v1/"
+        )
+
+        requireNotNull(track)
+        assertEquals(
+            "https://gateway.example/v1/tracks/track-custom/stream",
+            track.streamUri
+        )
+    }
+
+    @Test
     fun fallsBackToHandleAndSmallArtwork() {
         val json = JSONObject(
             """
