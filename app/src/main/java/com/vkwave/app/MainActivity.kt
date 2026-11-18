@@ -373,6 +373,7 @@ private fun SettingsScreen(
         mutableStateOf(jamendo?.configuredClientId.orEmpty())
     }
     var savingJamendo by remember { mutableStateOf(false) }
+    var jamendoMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     suspend fun refreshStatuses() {
@@ -411,10 +412,17 @@ private fun SettingsScreen(
                     onClick = {
                         scope.launch {
                             savingJamendo = true
-                            jamendo?.setClientId(jamendoClientId)
-                            context.persistJamendoClientId(jamendoClientId)
-                            statuses = loadSourceStatusLabels(sourceRegistry)
-                            savingJamendo = false
+                            jamendoMessage = null
+                            try {
+                                jamendo?.setClientId(jamendoClientId)
+                                context.persistJamendoClientId(jamendoClientId)
+                                statuses = loadSourceStatusLabels(sourceRegistry)
+                                jamendoMessage = "Настройки Jamendo сохранены"
+                            } catch (error: Exception) {
+                                jamendoMessage = error.message ?: "Не удалось сохранить Client ID"
+                            } finally {
+                                savingJamendo = false
+                            }
                         }
                     },
                     enabled = !savingJamendo && jamendo != null,
@@ -427,6 +435,7 @@ private fun SettingsScreen(
                     color = Muted,
                     fontSize = 11.sp
                 )
+                jamendoMessage?.let { Text(it, color = Muted, fontSize = 11.sp) }
             }
         }
         OutlinedButton(
