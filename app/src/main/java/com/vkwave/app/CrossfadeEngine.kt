@@ -69,6 +69,8 @@ class CrossfadeEngine(context: Context) {
     var masterVolume: Float = 1f
         private set
 
+    private var focusGain: Float = 1f
+
     val activePlayer: ExoPlayer
         get() = players[active]
 
@@ -217,6 +219,12 @@ class CrossfadeEngine(context: Context) {
 
     fun setMasterVolume(volume: Float) {
         masterVolume = volume.coerceIn(0f, 1f)
+        applyVolumes()
+    }
+
+    /** Temporary system focus ducking must never overwrite the user's volume. */
+    fun setFocusGain(gain: Float) {
+        focusGain = gain.coerceIn(0f, 1f)
         applyVolumes()
     }
 
@@ -510,8 +518,8 @@ class CrossfadeEngine(context: Context) {
     }
 
     private fun applyVolumes() {
-        players[active].volume = outgoingGain * masterVolume
-        players[1 - active].volume = incomingGain * masterVolume
+        players[active].volume = CrossfadeMath.outputVolume(outgoingGain, masterVolume, focusGain)
+        players[1 - active].volume = CrossfadeMath.outputVolume(incomingGain, masterVolume, focusGain)
     }
 
     fun release() {
