@@ -13,9 +13,7 @@ internal fun nextPlayableQueueIndexes(
     repeatMode: QueueRepeatMode,
     unavailableIndexes: Set<Int> = emptySet()
 ): List<Int> {
-    if (queueSize < 2 || currentIndex !in 0 until queueSize || repeatMode == QueueRepeatMode.ONE) {
-        return emptyList()
-    }
+    if (queueSize < 2 || currentIndex !in 0 until queueSize) return emptyList()
     val ordered = buildList {
         addAll((currentIndex + 1 until queueSize).toList())
         if (repeatMode == QueueRepeatMode.ALL) addAll((0 until currentIndex).toList())
