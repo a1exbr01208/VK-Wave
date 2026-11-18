@@ -40,7 +40,7 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - `LocalAudioSource` reads the device's indexed music through Android MediaStore and resolves local content URIs
 - `AudiusMusicSource` uses the official read-only Audius REST API for catalog search and stream URLs
 - `JamendoMusicSource` uses the official Jamendo API v3 for independent-music search and playback redirects; configure `JAMENDO_CLIENT_ID` in the local `local.properties` file
-- Search now discovers providers from the registry and lets the user switch between available catalogs
+- Search now runs one query concurrently across every registered provider with search capability and displays results grouped by source
 - Local audio requests Android audio-library permission at runtime and exposes a browsable device library
 
 ### Planned source adapters
