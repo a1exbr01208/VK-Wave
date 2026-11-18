@@ -778,11 +778,8 @@ private fun SourceSearchScreen(
             }
         }
 
-        itemsIndexed(
-            items = groups,
-            key = { _, group -> "source:${group.source.id}" }
-        ) { _, group ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        groups.forEach { group ->
+            item(key = "source-header:${group.source.id}") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -793,27 +790,36 @@ private fun SourceSearchScreen(
                         Text("${group.tracks.size} треков", color = Muted, fontSize = 11.sp)
                     }
                 }
-                group.message?.let { Text(it, color = Muted, fontSize = 12.sp) }
-                group.tracks.forEachIndexed { index, track ->
-                    Surface(
-                        color = Panel,
-                        shape = RoundedCornerShape(14.dp),
-                        modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(group.tracks, index) }
+            }
+            group.message?.let { message ->
+                item(key = "source-message:${group.source.id}") {
+                    Text(message, color = Muted, fontSize = 12.sp)
+                }
+            }
+            itemsIndexed(
+                items = group.tracks,
+                key = { _, track -> "track:${group.source.id}:${track.id}" }
+            ) { index, track ->
+                Surface(
+                    color = Panel,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().clickable { onPlayTracks(group.tracks, index) }
+                ) {
+                    Row(
+                        Modifier.padding(14.dp).fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        Row(
-                            Modifier.padding(14.dp).fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
-                                Text(track.artist, color = Muted, fontSize = 12.sp)
-                            }
-                            Icon(Icons.Default.PlayArrow, contentDescription = "Слушать", tint = Accent)
+                        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(track.artist, color = Muted, fontSize = 12.sp)
                         }
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Слушать", tint = Accent)
                     }
                 }
-                if (group.nextPageToken != null || group.loadingMore) {
+            }
+            if (group.nextPageToken != null || group.loadingMore) {
+                item(key = "source-pagination:${group.source.id}") {
                     OutlinedButton(
                         onClick = { loadNextPage(group) },
                         enabled = !loading && !group.loadingMore && !loadingMore && query.trim() == resultQuery,
