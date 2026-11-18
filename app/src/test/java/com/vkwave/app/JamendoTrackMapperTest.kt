@@ -4,8 +4,27 @@ import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 
 class JamendoTrackMapperTest {
+
+    @Test
+    fun runtimeClientIdConfigurationUpdatesConnectionState() = runBlocking {
+        val source = JamendoMusicSource(clientId = "")
+        assertEquals(
+            true,
+            source.connectionState() is SourceConnectionState.NeedsConfiguration
+        )
+
+        source.setClientId("public-client-id")
+        assertEquals(SourceConnectionState.Available, source.connectionState())
+        source.setClientId("")
+        assertEquals(
+            true,
+            source.connectionState() is SourceConnectionState.NeedsConfiguration
+        )
+    }
+
 
     @Test
     fun mapsTrackMetadataAndArtwork() {
