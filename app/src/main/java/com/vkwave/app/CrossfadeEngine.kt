@@ -215,6 +215,21 @@ class CrossfadeEngine(context: Context) {
         applyVolumes()
     }
 
+    fun seekBack() {
+        if (released) return
+        seekBy(-activePlayer.seekBackIncrement)
+    }
+
+    fun seekForward() {
+        if (released) return
+        seekBy(activePlayer.seekForwardIncrement)
+    }
+
+    fun seekBy(offsetMs: Long) {
+        if (released || activePlayer.mediaItemCount == 0) return
+        seekTo((activePlayer.currentPosition + offsetMs).coerceAtLeast(0L))
+    }
+
     fun seekTo(positionMs: Long) {
         if (released || activePlayer.mediaItemCount == 0) return
         val interruptedTransition = transitionJob?.isActive == true
