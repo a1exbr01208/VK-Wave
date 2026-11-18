@@ -313,7 +313,7 @@ private fun SourceLibraryScreen(
             loading = true
             try {
                 tracks = provider.library().tracks
-                message = if (tracks.isEmpty()) "На устройстве пока не найдено музыкальных файлов" else "Найдено файлов: \${tracks.size}"
+                message = if (tracks.isEmpty()) "На устройстве пока не найдено музыкальных файлов" else "Найдено файлов: ${tracks.size}"
             } catch (error: Exception) {
                 message = error.message ?: "Не удалось прочитать медиатеку"
             } finally {
