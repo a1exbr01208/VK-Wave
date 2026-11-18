@@ -197,7 +197,7 @@ internal object InternetArchiveTrackMapper {
         value.isNotEmpty() &&
             value != "." &&
             value != ".." &&
-            value.none { it == '\\' || it.code < 0x20 || it.code == 0x7f }
+            value.none { it == '/' || it == '\\' || it.code < 0x20 || it.code == 0x7f }
 
     private fun isAllowedLicense(value: String): Boolean {
         val normalized = value.lowercase()
