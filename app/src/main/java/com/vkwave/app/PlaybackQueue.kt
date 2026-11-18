@@ -1,5 +1,44 @@
 package com.vkwave.app
 
+/** Repeat behavior is independent of the provider and playback engine. */
+enum class QueueRepeatMode {
+    OFF,
+    ALL,
+    ONE
+}
+
+internal fun nextPlayableQueueIndexes(
+    queueSize: Int,
+    currentIndex: Int,
+    repeatMode: QueueRepeatMode,
+    unavailableIndexes: Set<Int> = emptySet()
+): List<Int> {
+    if (queueSize < 2 || currentIndex !in 0 until queueSize || repeatMode == QueueRepeatMode.ONE) {
+        return emptyList()
+    }
+    val ordered = buildList {
+        addAll((currentIndex + 1 until queueSize).toList())
+        if (repeatMode == QueueRepeatMode.ALL) addAll((0 until currentIndex).toList())
+    }
+    return ordered.filterNot(unavailableIndexes::contains)
+}
+
+internal fun previousPlayableQueueIndexes(
+    queueSize: Int,
+    currentIndex: Int,
+    repeatMode: QueueRepeatMode,
+    unavailableIndexes: Set<Int> = emptySet()
+): List<Int> {
+    if (queueSize < 2 || currentIndex !in 0 until queueSize) return emptyList()
+    val ordered = buildList {
+        addAll((currentIndex - 1 downTo 0).toList())
+        if (repeatMode == QueueRepeatMode.ALL) {
+            addAll((queueSize - 1 downTo currentIndex + 1).toList())
+        }
+    }
+    return ordered.filterNot(unavailableIndexes::contains)
+}
+
 internal fun resolveQueueStartIndex(
     resolvedOriginalIndexes: List<Int>,
     requestedIndex: Int
@@ -7,13 +46,6 @@ internal fun resolveQueueStartIndex(
     val requested = requestedIndex.coerceAtLeast(0)
     val nextPlayable = resolvedOriginalIndexes.indexOfFirst { it >= requested }
     return nextPlayable.takeIf { it >= 0 } ?: resolvedOriginalIndexes.lastIndex.takeIf { it >= 0 }
-}
-
-/** Repeat behavior is independent of the provider and playback engine. */
-enum class QueueRepeatMode {
-    OFF,
-    ALL,
-    ONE
 }
 
 /**
@@ -51,26 +83,17 @@ class PlaybackQueue {
     fun next(): WaveTrack? {
         if (items.isEmpty() || currentIndex < 0) return null
         if (repeatMode == QueueRepeatMode.ONE) return current
-        if (currentIndex < items.lastIndex) {
-            currentIndex += 1
-            return current
-        }
-        if (repeatMode == QueueRepeatMode.ALL) {
-            currentIndex = 0
-            return current
-        }
-        return null
+        val target = nextPlayableQueueIndexes(items.size, currentIndex, repeatMode).firstOrNull()
+            ?: return null
+        currentIndex = target
+        return current
     }
 
     fun previous(): WaveTrack? {
         if (items.isEmpty() || currentIndex < 0) return null
-        if (currentIndex > 0) {
-            currentIndex -= 1
-            return current
-        }
-        if (repeatMode == QueueRepeatMode.ALL) {
-            currentIndex = items.lastIndex
-        }
+        val target = previousPlayableQueueIndexes(items.size, currentIndex, repeatMode).firstOrNull()
+            ?: return current
+        currentIndex = target
         return current
     }
 }
