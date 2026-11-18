@@ -12,8 +12,8 @@ import java.net.URLEncoder
 /**
  * Official Jamendo API v3 adapter.
  *
- * Jamendo requires an application client_id. Keep it in local.properties as
- * JAMENDO_CLIENT_ID; never commit credentials or the local properties file.
+ * Jamendo requires an application client_id. It can be supplied from local.properties
+ * for development or configured by the user in Settings. It is a public app identifier.
  */
 class JamendoMusicSource(
     clientId: String = BuildConfig.JAMENDO_CLIENT_ID,
@@ -47,7 +47,7 @@ class JamendoMusicSource(
     override suspend fun connectionState(): SourceConnectionState =
         if (clientId.isBlank()) {
             SourceConnectionState.NeedsConfiguration(
-                "Jamendo: добавь JAMENDO_CLIENT_ID в local.properties для подключения каталога"
+                "Jamendo: укажи публичный Client ID в настройках приложения"
             )
         } else {
             SourceConnectionState.Available
@@ -101,7 +101,7 @@ class JamendoMusicSource(
 
     private fun ensureConfigured() {
         if (clientId.isBlank()) {
-            throw IllegalStateException("Jamendo не настроен: нужен JAMENDO_CLIENT_ID в local.properties")
+            throw IllegalStateException("Jamendo не настроен: укажи Client ID в настройках приложения")
         }
     }
 
