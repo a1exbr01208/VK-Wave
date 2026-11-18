@@ -99,6 +99,8 @@ class MainActivity : ComponentActivity() {
 
     private fun startDemoPlayback() {
         val controller = mediaControllerState.value ?: return
+        resolvePlaybackJob?.cancel()
+        resolvePlaybackJob = null
         lifecycleScope.launch {
             val items = DemoAudioProvider(applicationContext).createPlaylist()
             if (mediaControllerState.value !== controller) return@launch
@@ -630,7 +632,8 @@ private fun SourceSearchScreen(
                     searchJob?.cancel()
                     paginationJob?.cancel()
                     loading = false
-                    groups = groups.map { it.copy(loadingMore = false) }
+                    hasSearched = false
+                    groups = emptyList()
                 }
             },
             modifier = Modifier.fillMaxWidth(),
