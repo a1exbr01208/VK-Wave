@@ -15,6 +15,7 @@ sealed interface SourceConnectionState {
     data object Available : SourceConnectionState
     data object NeedsPermission : SourceConnectionState
     data object NeedsAuthentication : SourceConnectionState
+    data class NeedsConfiguration(val reason: String) : SourceConnectionState
     data class Unavailable(val reason: String) : SourceConnectionState
 }
 
