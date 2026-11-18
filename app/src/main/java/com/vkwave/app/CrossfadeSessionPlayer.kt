@@ -45,8 +45,12 @@ class CrossfadeSessionPlayer(
         if (queue.isNotEmpty()) {
             commands.add(Player.COMMAND_GET_TIMELINE)
             commands.add(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+            // The custom session player handles this command in handleSeek().
+            // Expose it explicitly or MediaController disables the seek bar.
+            commands.add(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         } else {
             commands.remove(Player.COMMAND_SEEK_TO_MEDIA_ITEM)
+            commands.remove(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         }
 
         val playlist = queue.mapIndexed { index, mediaItem ->
