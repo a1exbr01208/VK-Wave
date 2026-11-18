@@ -95,7 +95,7 @@ private val waveTabs = listOf(
     WaveTab("Поиск", Icons.Default.Search),
     WaveTab("Медиатека", Icons.Default.LibraryMusic),
     WaveTab("Очередь", Icons.AutoMirrored.Filled.QueueMusic),
-    WaveTab("Настройки", Icons.Default.Settings)
+    WaveTab("Профиль", Icons.Default.Person)
 )
 
 class MainActivity : ComponentActivity() {
@@ -370,8 +370,8 @@ fun VKWaveApp(
                             onPlaySourceTracks
                         )
                         "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
-                        "Настройки" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
-                        else -> PlayerCard(
+                        "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
+                        "Плеер" -> PlayerCard(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
                             positionMs, durationMs, controller != null,
@@ -381,8 +381,24 @@ fun VKWaveApp(
                             { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
                             onDemoPlayback
                         )
+                        else -> HomeScreen(
+                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                            currentTitle, currentArtist, hasMedia, playing,
+                            { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                            { tab = "Плеер" },
+                            { tab = "Поиск" },
+                            { tab = "Медиатека" }
+                        )
                     }
-                    CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
+                    if (hasMedia && tab != "Плеер") {
+                        MiniPlayer(
+                            currentTitle, currentArtist, playing,
+                            onClick = { tab = "Плеер" },
+                            onPlay = { controller?.let { if (it.isPlaying) it.pause() else it.play() } },
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                        )
+                    }
+                    CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                     NavigationBar(containerColor = Panel, contentColor = LocalWavePalette.current.foreground) {
                         waveTabs.forEach { item ->
                             NavigationBarItem(
@@ -424,8 +440,8 @@ fun VKWaveApp(
                             "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth())
-                            "Настройки" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth())
-                            else -> PlayerCard(
+                            "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth())
+                            "Плеер" -> PlayerCard(
                                 Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
                                 canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
                                 { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
@@ -434,8 +450,20 @@ fun VKWaveApp(
                                 { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
                                 onDemoPlayback
                             )
+                            else -> HomeScreen(
+                                Modifier.weight(1f).fillMaxWidth(),
+                                currentTitle, currentArtist, hasMedia, playing,
+                                { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                                { tab = "Плеер" }, { tab = "Поиск" }, { tab = "Медиатека" }
+                            )
                         }
-                        CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 16.dp))
+                        if (hasMedia && tab != "Плеер") {
+                            MiniPlayer(currentTitle, currentArtist, playing,
+                                onClick = { tab = "Плеер" },
+                                onPlay = { controller?.let { if (it.isPlaying) it.pause() else it.play() } },
+                                modifier = Modifier.padding(top = 12.dp))
+                        }
+                        CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 10.dp))
                     }
                 }
             }
@@ -1054,6 +1082,160 @@ private fun QueueScreen(
         }
     }
 }
+@Composable
+private fun HomeScreen(
+    modifier: Modifier = Modifier,
+    title: String,
+    artist: String,
+    hasMedia: Boolean,
+    playing: Boolean,
+    onPlay: () -> Unit,
+    onOpenPlayer: () -> Unit,
+    onSearch: () -> Unit,
+    onLibrary: () -> Unit
+) {
+    LazyColumn(
+        modifier,
+        verticalArrangement = Arrangement.spacedBy(18.dp)
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("ТВОЯ МУЗЫКА", color = Accent, fontSize = 11.sp,
+                    letterSpacing = 2.4.sp, fontWeight = FontWeight.Bold)
+                Text("С возвращением", color = LocalWavePalette.current.foreground,
+                    fontSize = 28.sp, fontWeight = FontWeight.Bold)
+                Text("Что будем слушать сегодня?", color = Muted, fontSize = 14.sp)
+            }
+        }
+        item {
+            Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp))
+                    .background(Brush.linearGradient(
+                        listOf(Color(0xFF49377B), Color(0xFF252D4A), Color(0xFF171B2B))
+                    )).clickable { if (hasMedia) onOpenPlayer() else onSearch() }
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("СЕЙЧАС В ЭФИРЕ", color = Color.White.copy(alpha = .72f),
+                        fontSize = 10.sp, letterSpacing = 1.8.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.GraphicEq, contentDescription = null,
+                        tint = Color.White.copy(alpha = .8f))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Box(Modifier.size(86.dp).clip(RoundedCornerShape(18.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFFC29AFF), Color(0xFF536C9E)))),
+                        contentAlignment = Alignment.Center) {
+                        Icon(Icons.Default.MusicNote, contentDescription = null,
+                            tint = Color.White, modifier = Modifier.size(42.dp))
+                    }
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                        Text(if (hasMedia) title else "Музыка ждёт тебя",
+                            color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 2)
+                        Text(if (hasMedia) artist else "Найди любимые треки",
+                            color = Color.White.copy(alpha = .72f), fontSize = 12.sp, maxLines = 1)
+                        Text(if (hasMedia) "ОТКРЫТЬ ПЛЕЕР" else "ПЕРЕЙТИ К ПОИСКУ",
+                            color = Color(0xFFD5C3FF), fontSize = 10.sp,
+                            letterSpacing = 1.2.sp, fontWeight = FontWeight.Bold)
+                    }
+                    FilledIconButton(onClick = { if (hasMedia) onPlay() else onSearch() },
+                        colors = IconButtonDefaults.filledIconButtonColors(
+                            containerColor = Color.White, contentColor = Color(0xFF29213F)
+                        ), modifier = Modifier.size(48.dp)) {
+                        Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            contentDescription = if (playing) "Пауза" else "Воспроизвести")
+                    }
+                }
+            }
+        }
+        item {
+            Text("Быстрый доступ", color = LocalWavePalette.current.foreground,
+                fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                HomeQuickAction("Поиск музыки", "Найди новый трек", Icons.Default.Search,
+                    Modifier.weight(1f), onSearch)
+                HomeQuickAction("Медиатека", "Музыка на устройстве", Icons.Default.LibraryMusic,
+                    Modifier.weight(1f), onLibrary)
+            }
+        }
+        item {
+            Surface(color = Panel, shape = RoundedCornerShape(20.dp),
+                modifier = Modifier.fillMaxWidth().clickable { onOpenPlayer() }) {
+                Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.Headphones, contentDescription = null, tint = Accent,
+                        modifier = Modifier.size(26.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text("Твой музыкальный поток", color = LocalWavePalette.current.foreground,
+                            fontWeight = FontWeight.SemiBold)
+                        Text("Управляй воспроизведением и очередью", color = Muted, fontSize = 12.sp)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Muted)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeQuickAction(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
+    Surface(color = Panel, shape = RoundedCornerShape(18.dp),
+        modifier = modifier.clickable(onClick = onClick)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
+            Icon(icon, contentDescription = null, tint = Accent, modifier = Modifier.size(24.dp))
+            Text(title, color = LocalWavePalette.current.foreground,
+                fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(subtitle, color = Muted, fontSize = 11.sp, maxLines = 2)
+        }
+    }
+}
+
+@Composable
+private fun MiniPlayer(
+    title: String,
+    artist: String,
+    playing: Boolean,
+    onClick: () -> Unit,
+    onPlay: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(color = Panel, shape = RoundedCornerShape(16.dp),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick)) {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(10.dp))
+                .background(Brush.linearGradient(listOf(Accent, Color(0xFF3B6D83)))),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.White)
+            }
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, color = LocalWavePalette.current.foreground,
+                    fontWeight = FontWeight.SemiBold, fontSize = 12.sp, maxLines = 1)
+                Text(artist, color = Muted, fontSize = 10.sp, maxLines = 1)
+            }
+            IconButton(onClick = onPlay) {
+                Icon(if (playing) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    contentDescription = if (playing) "Пауза" else "Воспроизвести",
+                    tint = LocalWavePalette.current.foreground)
+            }
+            IconButton(onClick = onClick) {
+                Icon(Icons.Default.ExpandLess, contentDescription = "Открыть плеер",
+                    tint = Accent)
+            }
+        }
+    }
+}
+
 @Composable
 private fun WaveLogo() {
     Box(
