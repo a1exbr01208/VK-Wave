@@ -15,7 +15,8 @@ class JamendoTrackMapperTest {
               "id": "98765",
               "name": "Night Drive",
               "artist_name": "Example Artist",
-              "image": "https://usercontent.jamendo.com?image=cover"
+              "image": "https://usercontent.jamendo.com?image=cover",
+              "audio": "https://prod-1.storage.jamendo.com/?trackid=98765"
             }
             """.trimIndent()
         )
@@ -27,6 +28,7 @@ class JamendoTrackMapperTest {
         assertEquals("Night Drive", track.title)
         assertEquals("Example Artist", track.artist)
         assertEquals("https://usercontent.jamendo.com?image=cover", track.artworkUri)
+        assertEquals("https://prod-1.storage.jamendo.com/?trackid=98765", track.streamUri)
         assertEquals("jamendo", track.sourceId)
         assertEquals("98765", track.providerTrackId)
     }
