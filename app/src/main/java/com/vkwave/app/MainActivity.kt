@@ -208,38 +208,28 @@ fun VKWaveApp(
             if (maxWidth < 600.dp) {
                 Column(Modifier.fillMaxSize()) {
                     WaveHeader(tab, Modifier.padding(horizontal = 20.dp, vertical = 16.dp))
-                    if (tab == "Поиск") {
-                        when (tab) {
-                            "Поиск" -> SourceSearchScreen(
-                                sourceRegistry,
-                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                                onPlaySourceTracks
-                            )
-                            "Медиатека" -> SourceLibraryScreen(
-                                sourceRegistry,
-                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                                onPlaySourceTracks
-                            )
-                            else -> PlayerCard(
-                                Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                                currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
-                                { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
-                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
-                                { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
-                                { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
-                                onDemoPlayback
-                            )
-                        }
-                    /* Player surface is selected above. */
-                    if (false) PlayerCard(
-                        Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
-                        currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
-                        { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
-                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
-                        { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
-                        { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
-                        onDemoPlayback
-                    )
+                    when (tab) {
+                        "Поиск" -> SourceSearchScreen(
+                            sourceRegistry,
+                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                            onPlaySourceTracks
+                        )
+                        "Медиатека" -> SourceLibraryScreen(
+                            sourceRegistry,
+                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                            onPlaySourceTracks
+                        )
+                        else -> PlayerCard(
+                            Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
+                            currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
+                            positionMs, durationMs, controller != null,
+                            { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
+                            { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
+                            { target -> controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)) it.seekTo(target) } },
+                            onDemoPlayback
+                        )
+                    }
                     CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(16.dp))
                     NavigationBar(containerColor = Panel, contentColor = Color.White) {
                         waveTabs.forEach { item ->
