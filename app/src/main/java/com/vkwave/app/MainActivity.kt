@@ -43,14 +43,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-internal fun resolveQueueStartIndex(
-    resolvedOriginalIndexes: List<Int>,
-    requestedIndex: Int
-): Int? {
-    val requested = requestedIndex.coerceAtLeast(0)
-    return resolvedOriginalIndexes.indexOfFirst { it >= requested }.takeIf { it >= 0 }
-}
-
 private val Ink = Color(0xFF101116)
 private val Panel = Color(0xFF1B1D25)
 private val Accent = Color(0xFF9B7BFF)
