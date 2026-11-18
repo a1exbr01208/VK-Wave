@@ -297,7 +297,7 @@ fun VKWaveApp(
     }
 
     val currentTitle = controller?.currentMediaItem?.mediaMetadata?.title?.toString()
-        ?.takeIf { it.isNotBlank() } ?: "VK Wave готов к воспроизведению"
+        ?.takeIf { it.isNotBlank() } ?: "Wave Player готов к воспроизведению"
     val currentArtist = controller?.currentMediaItem?.mediaMetadata?.artist?.toString()
         ?.takeIf { it.isNotBlank() } ?: "Источник аудио пока не подключён"
 
@@ -983,7 +983,7 @@ private fun WaveLogo() {
             .background(Brush.linearGradient(listOf(Accent, Color(0xFF43C6AC)))),
         contentAlignment = Alignment.Center
     ) {
-        Icon(Icons.Default.GraphicEq, contentDescription = "VK Wave", tint = Color.White)
+        Icon(Icons.Default.GraphicEq, contentDescription = "Wave Player", tint = Color.White)
     }
 }
 
@@ -991,7 +991,7 @@ private fun WaveLogo() {
 private fun WaveHeader(tab: String, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text("VK WAVE", color = Color.White, fontSize = 12.sp,
+            Text("WAVE PLAYER", color = Color.White, fontSize = 12.sp,
                 letterSpacing = 3.sp, fontWeight = FontWeight.Bold)
             Text(tab, color = Color.White, fontSize = 28.sp, fontWeight = FontWeight.Bold)
         }

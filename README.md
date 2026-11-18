@@ -1,4 +1,4 @@
-# VK Wave for Android
+# Wave Player for Android
 
 Android music player with a provider-neutral playback core and seamless track transitions.
 
