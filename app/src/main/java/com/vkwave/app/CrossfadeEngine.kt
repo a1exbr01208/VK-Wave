@@ -218,17 +218,20 @@ class CrossfadeEngine(context: Context) {
     }
 
     fun setMasterVolume(volume: Float) {
+        if (released) return
         masterVolume = volume.coerceIn(0f, 1f)
         applyVolumes()
     }
 
     /** Temporary system focus ducking must never overwrite the user's volume. */
     fun setFocusGain(gain: Float) {
+        if (released) return
         focusGain = gain.coerceIn(0f, 1f)
         applyVolumes()
     }
 
     fun setRepeatMode(mode: QueueRepeatMode) {
+        if (released) return
         repeatMode = mode
         players.forEach(::applyRepeatMode)
         if (transitionJob?.isActive != true) prepareUpcoming()
@@ -254,7 +257,7 @@ class CrossfadeEngine(context: Context) {
         jumpTo(targetIndex, positionMs)
 
     private fun jumpTo(targetIndex: Int, positionMs: Long = 0L): Boolean {
-        if (targetIndex !in playlist.indices) return false
+        if (released || targetIndex !in playlist.indices) return false
         val wasPlaying = activePlayer.playWhenReady
         queueGeneration += 1
         transitionJob?.cancel()
