@@ -1,38 +1,38 @@
 package com.vkwave.app
 
 import android.net.Uri
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Test
 
 class MusicSourceRegistryTest {
-    private class FakeSource(override val descriptor: SourceDescriptor) : MusicSource {
+    private class FakeSource(
+        override val descriptor: SourceDescriptor
+    ) : MusicSource {
         override suspend fun connectionState() = SourceConnectionState.Available
         override suspend fun search(query: String, pageToken: String?) = SourcePage(emptyList())
         override suspend fun library(pageToken: String?) = SourcePage(emptyList())
-        override suspend fun resolvePlayback(track: WaveTrack) = Uri.parse("https://example.invalid/audio")
+        override suspend fun resolvePlayback(track: WaveTrack) =
+            Uri.parse("https://example.invalid/audio")
     }
 
-    @Test
-    fun registersAndFindsSourcesByStableId() {
-        val registry = MusicSourceRegistry()
-        val source = FakeSource(SourceDescriptor("test", "Test source", SourceCapabilities(search = true)))
-        registry.register(source)
-
-        assertNotNull(registry.get("test"))
-        assertEquals(listOf(source.descriptor), registry.all())
-    }
+    private fun source(id: String, name: String = id) = FakeSource(
+        SourceDescriptor(id, name, SourceCapabilities(search = true))
+    )
 
     @Test
-    fun rejectsDuplicateIds() {
+    fun registerKeepsInsertionOrderAndRejectsDuplicateIds() {
         val registry = MusicSourceRegistry()
-        val descriptor = SourceDescriptor("test", "Test source", SourceCapabilities())
-        registry.register(FakeSource(descriptor))
+        val audius = source("audius")
+        val jamendo = source("jamendo")
+        registry.register(audius)
+        registry.register(jamendo)
 
+        assertSame(audius, registry.get("audius"))
+        assertEquals(listOf("audius", "jamendo"), registry.all().map { it.id })
         try {
-            registry.register(FakeSource(descriptor))
+            registry.register(source("audius", "Duplicate"))
             throw AssertionError("Duplicate source id should be rejected")
         } catch (_: IllegalArgumentException) {
             // Expected.
@@ -40,15 +40,27 @@ class MusicSourceRegistryTest {
     }
 
     @Test
-    fun replaceAndUnregisterWork() {
+    fun replaceUpdatesExistingSourceWithoutChangingItsPosition() {
         val registry = MusicSourceRegistry()
-        val first = FakeSource(SourceDescriptor("test", "First", SourceCapabilities()))
-        val replacement = FakeSource(SourceDescriptor("test", "Replacement", SourceCapabilities()))
-        registry.register(first)
+        registry.register(source("audius"))
+        registry.register(source("jamendo"))
+        val replacement = source("audius", "Audius replacement")
+
         registry.replace(replacement)
 
-        assertEquals("Replacement", registry.get("test")?.descriptor?.displayName)
-        assertNotNull(registry.unregister("test"))
-        assertNull(registry.get("test"))
+        assertSame(replacement, registry.get("audius"))
+        assertEquals(listOf("audius", "jamendo"), registry.all().map { it.id })
+        assertEquals("Audius replacement", registry.all().first().displayName)
+    }
+
+    @Test
+    fun unregisterReturnsRemovedSourceAndMissingIdsReturnNull() {
+        val registry = MusicSourceRegistry()
+        val audius = source("audius")
+        registry.register(audius)
+
+        assertSame(audius, registry.unregister("audius"))
+        assertNull(registry.get("audius"))
+        assertNull(registry.unregister("missing"))
     }
 }
