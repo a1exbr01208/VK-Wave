@@ -107,13 +107,13 @@ class CrossfadeEngine(context: Context) {
         playlist = items.toList()
         index = if (playlist.isEmpty()) 0 else startIndex.coerceIn(playlist.indices)
 
-        players.forEachIndexed { playerIndex, player ->
+        players.forEach { player ->
             player.stop()
             player.clearMediaItems()
-            player.volume = if (playerIndex == active) masterVolume else 0f
         }
         outgoingGain = 1f
         incomingGain = 0f
+        applyVolumes()
 
         if (playlist.isEmpty()) return
 
@@ -271,7 +271,7 @@ class CrossfadeEngine(context: Context) {
         index = targetIndex
         outgoingGain = 1f
         incomingGain = 0f
-        current.volume = masterVolume
+        applyVolumes()
         current.setMediaItem(playlist[index], positionMs.coerceAtLeast(0L))
         current.prepare()
         applyRepeatMode(current)
