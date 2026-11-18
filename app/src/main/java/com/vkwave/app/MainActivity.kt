@@ -557,6 +557,9 @@ private fun QueueScreen(
             override fun onMediaItemTransition(mediaItem: androidx.media3.common.MediaItem?, reason: Int) {
                 revision++
             }
+            override fun onRepeatModeChanged(repeatMode: Int) {
+                revision++
+            }
         }
         controller?.addListener(listener)
         onDispose { controller?.removeListener(listener) }
@@ -588,6 +591,31 @@ private fun QueueScreen(
                 enabled = canChange && queue.isNotEmpty()
             ) {
                 Text("Очистить")
+            }
+        }
+
+        if (controller != null) {
+            val repeatLabel = when (controller.repeatMode) {
+                Player.REPEAT_MODE_ONE -> "Повтор: трек"
+                Player.REPEAT_MODE_ALL -> "Повтор: очередь"
+                else -> "Повтор: выкл."
+            }
+            OutlinedButton(
+                onClick = {
+                    if (controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)) {
+                        val next = when (controller.repeatMode) {
+                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                            else -> Player.REPEAT_MODE_OFF
+                        }
+                        controller.repeatMode = next
+                    }
+                },
+                enabled = controller.isCommandAvailable(Player.COMMAND_SET_REPEAT_MODE)
+            ) {
+                Icon(Icons.Default.Repeat, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text(repeatLabel)
             }
         }
 
