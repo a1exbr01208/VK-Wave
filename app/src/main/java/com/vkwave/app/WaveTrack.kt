@@ -11,7 +11,11 @@ data class WaveTrack(
     val artworkUri: String? = null,
     val streamUri: String? = null,
     val sourceId: String = "unknown",
-    val providerTrackId: String = id
+    val providerTrackId: String = id,
+    val album: String? = null,
+    val genre: String? = null,
+    val durationMs: Long? = null,
+    val year: Int? = null
 ) {
     init {
         require(id.isNotBlank()) { "Track id must not be blank" }

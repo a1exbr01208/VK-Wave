@@ -128,7 +128,10 @@ internal object AudiusTrackMapper {
             artworkUri = artworkUrl,
             streamUri = "${apiBaseUrl.trimEnd('/')}/tracks/$trackId/stream",
             sourceId = "audius",
-            providerTrackId = trackId
+            providerTrackId = trackId,
+            album = item.optJSONObject("album")?.optString("title")?.takeIf { it.isNotBlank() && it != "null" },
+            genre = item.optString("genre").takeIf { it.isNotBlank() && it != "null" },
+            durationMs = item.optLong("duration", 0L).takeIf { it > 0L }?.times(1_000L)
         )
     }
 

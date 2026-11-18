@@ -762,11 +762,38 @@ private fun SourceSearchScreen(
     var loading by remember { mutableStateOf(false) }
     var hasSearched by remember { mutableStateOf(false) }
     var resultQuery by remember { mutableStateOf("") }
+    var filtersExpanded by remember { mutableStateOf(false) }
+    var artistFilter by remember { mutableStateOf("") }
+    var titleFilter by remember { mutableStateOf("") }
+    var albumFilter by remember { mutableStateOf("") }
+    var genreFilter by remember { mutableStateOf("") }
+    var sourceFilter by remember { mutableStateOf("all") }
+    var sortFilter by remember { mutableStateOf("relevance") }
+    var durationFilter by remember { mutableStateOf("any") }
     val scope = rememberCoroutineScope()
     var searchJob by remember { mutableStateOf<Job?>(null) }
     var paginationJob by remember { mutableStateOf<Job?>(null) }
     var searchGeneration by remember { mutableIntStateOf(0) }
     val loadingMore = groups.any { it.loadingMore }
+    val filteredGroups = groups.map { group ->
+        val filtered = group.tracks.filter { track ->
+            (artistFilter.isBlank() || track.artist.contains(artistFilter.trim(), ignoreCase = true)) &&
+                (titleFilter.isBlank() || track.title.contains(titleFilter.trim(), ignoreCase = true)) &&
+                (albumFilter.isBlank() || track.album?.contains(albumFilter.trim(), ignoreCase = true) == true) &&
+                (genreFilter.isBlank() || track.genre?.contains(genreFilter.trim(), ignoreCase = true) == true) &&
+                when (durationFilter) {
+                    "short" -> track.durationMs != null && track.durationMs < 180_000L
+                    "medium" -> track.durationMs != null && track.durationMs in 180_000L..600_000L
+                    "long" -> track.durationMs != null && track.durationMs > 600_000L
+                    else -> true
+                }
+        }.let { list -> when (sortFilter) {
+            "title" -> list.sortedBy { it.title.lowercase() }
+            "artist" -> list.sortedBy { it.artist.lowercase() }
+            else -> list
+        } }
+        group.copy(tracks = filtered)
+    }.filter { sourceFilter == "all" || it.source.id == sourceFilter }
 
     fun loadNextPage(group: SourceSearchGroup) {
         val token = group.nextPageToken ?: return
@@ -832,6 +859,63 @@ private fun SourceSearchScreen(
                     label = { Text("Трек или исполнитель") },
                     singleLine = true
                 )
+                OutlinedButton(
+                    onClick = { filtersExpanded = !filtersExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(Icons.Default.Tune, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (filtersExpanded) "Скрыть фильтры" else "Фильтры поиска")
+                    Spacer(Modifier.weight(1f))
+                    Text(if (artistFilter.isNotBlank() || titleFilter.isNotBlank() || albumFilter.isNotBlank() || genreFilter.isNotBlank() || sourceFilter != "all" || sortFilter != "relevance" || durationFilter != "any") "Активны" else "Все")
+                }
+                if (filtersExpanded) {
+                    Surface(color = Panel, shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text("Уточнить результаты", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
+                            OutlinedTextField(value = artistFilter, onValueChange = { artistFilter = it },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Исполнитель") })
+                            OutlinedTextField(value = titleFilter, onValueChange = { titleFilter = it },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Название трека") })
+                            OutlinedTextField(value = albumFilter, onValueChange = { albumFilter = it },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Альбом") })
+                            OutlinedTextField(value = genreFilter, onValueChange = { genreFilter = it },
+                                modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Жанр") })
+                            Text("Источник", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.Medium)
+                            var sourceMenu by remember { mutableStateOf(false) }
+                            Box {
+                                OutlinedButton(onClick = { sourceMenu = true }, modifier = Modifier.fillMaxWidth()) {
+                                    Text(if (sourceFilter == "all") "Все источники" else sources.firstOrNull { it.id == sourceFilter }?.displayName ?: "Все источники")
+                                    Spacer(Modifier.weight(1f))
+                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                                }
+                                DropdownMenu(expanded = sourceMenu, onDismissRequest = { sourceMenu = false }) {
+                                    DropdownMenuItem(text = { Text("Все источники") }, onClick = { sourceFilter = "all"; sourceMenu = false })
+                                    sources.forEach { descriptor ->
+                                        DropdownMenuItem(text = { Text(descriptor.displayName) }, onClick = { sourceFilter = descriptor.id; sourceMenu = false })
+                                    }
+                                }
+                            }
+                            Text("Длительность", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.Medium)
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                listOf("any" to "Любая", "short" to "До 3 мин", "medium" to "3–10 мин", "long" to "Более 10 мин").forEach { (id, label) ->
+                                    FilterChip(selected = durationFilter == id, onClick = { durationFilter = id }, label = { Text(label, fontSize = 10.sp) })
+                                }
+                            }
+                            Text("Сортировка", color = LocalWavePalette.current.foreground, fontWeight = FontWeight.Medium)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                FilterChip(selected = sortFilter == "relevance", onClick = { sortFilter = "relevance" }, label = { Text("Релевантность") })
+                                FilterChip(selected = sortFilter == "title", onClick = { sortFilter = "title" }, label = { Text("Название") })
+                                FilterChip(selected = sortFilter == "artist", onClick = { sortFilter = "artist" }, label = { Text("Исполнитель") })
+                            }
+                            Text("Фильтры по альбому, жанру и длительности применяются, если источник передал эти данные.", color = Muted, fontSize = 11.sp)
+                            TextButton(onClick = {
+                                artistFilter = ""; titleFilter = ""; albumFilter = ""; genreFilter = ""
+                                sourceFilter = "all"; sortFilter = "relevance"; durationFilter = "any"
+                            }, modifier = Modifier.align(Alignment.End)) { Text("Сбросить фильтры") }
+                        }
+                    }
+                }
                 Button(
                     onClick = {
                         val searchQuery = query.trim()
@@ -847,7 +931,7 @@ private fun SourceSearchScreen(
                                 hasSearched = true
                                 try {
                                     val results = coroutineScope {
-                                        sources.map { descriptor ->
+                                        sources.filter { sourceFilter == "all" || it.id == sourceFilter }.map { descriptor ->
                                             async {
                                                 val provider = sourceRegistry.get(descriptor.id)
                                                     ?: return@async SourceSearchGroup(descriptor, message = "Источник отключён")
@@ -894,13 +978,16 @@ private fun SourceSearchScreen(
                 if (groups.isNotEmpty() && query.trim() != resultQuery) {
                     Text("Результаты для «$resultQuery». Нажми «Искать везде», чтобы обновить.", color = Muted, fontSize = 11.sp)
                 }
-                if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
-                    Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
+                if (hasSearched && !loading && filteredGroups.all { it.tracks.isEmpty() }) {
+                    Text(if (groups.any { it.tracks.isNotEmpty() }) "По текущим фильтрам ничего не найдено" else "Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
+                }
+                if (filteredGroups.sumOf { it.tracks.size } > 0) {
+                    Text("Найдено после фильтрации: ${filteredGroups.sumOf { it.tracks.size }}", color = Muted, fontSize = 11.sp)
                 }
             }
         }
 
-        groups.forEach { group ->
+        filteredGroups.forEach { group ->
             item(key = "source-header:${group.source.id}") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -933,8 +1020,10 @@ private fun SourceSearchScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
+                            Text(track.title, color = LocalWavePalette.current.foreground, fontWeight = FontWeight.SemiBold)
                             Text(track.artist, color = Muted, fontSize = 12.sp)
+                            val details = listOfNotNull(track.album, track.genre, track.year?.toString()).joinToString(" · ")
+                            if (details.isNotBlank()) Text(details, color = Muted, fontSize = 10.sp)
                         }
                         Icon(Icons.Default.PlayArrow, contentDescription = "Слушать", tint = Accent)
                     }

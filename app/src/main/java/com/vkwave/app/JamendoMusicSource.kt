@@ -153,7 +153,13 @@ internal object JamendoTrackMapper {
             artworkUri = artwork,
             streamUri = stream,
             sourceId = JamendoMusicSource.SOURCE_ID,
-            providerTrackId = trackId
+            providerTrackId = trackId,
+            album = item.optString("album_name").takeIf { it.isNotBlank() && it != "null" },
+            genre = item.optJSONObject("musicinfo")?.optJSONObject("tags")?.optJSONArray("genres")
+                ?.let { tags -> (0 until tags.length()).map { tags.optString(it) }.filter { it.isNotBlank() }.joinToString(", ") }
+                ?.takeIf { it.isNotBlank() },
+            durationMs = item.optLong("duration", 0L).takeIf { it > 0L }?.times(1_000L),
+            year = item.optString("releasedate").takeIf { it.length >= 4 }?.take(4)?.toIntOrNull()
         )
     }
 }

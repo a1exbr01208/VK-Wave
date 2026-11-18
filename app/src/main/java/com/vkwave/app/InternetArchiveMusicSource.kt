@@ -189,7 +189,11 @@ internal object InternetArchiveTrackMapper {
             artworkUri = "${baseUrl.trimEnd('/')}/services/img/$encodedIdentifier",
             streamUri = streamUrl,
             sourceId = SOURCE_ID,
-            providerTrackId = "$identifier/$fileName"
+            providerTrackId = "$identifier/$fileName",
+            album = firstString(metadata.opt("album")),
+            genre = firstString(metadata.opt("genre")),
+            durationMs = metadata.optString("length").toDoubleOrNull()?.takeIf { it > 0.0 }?.times(1_000.0)?.toLong(),
+            year = metadata.optString("year").toIntOrNull()
         )
     }
 
