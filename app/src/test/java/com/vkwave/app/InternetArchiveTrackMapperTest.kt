@@ -91,4 +91,38 @@ class InternetArchiveTrackMapperTest {
             )
         )
     }
+
+    @Test
+    fun rejectsUnsafeArchiveIdentifiersAndFilePathSegments() {
+        val metadata = JSONObject(
+            """{"title":"Safe Recording","licenseurl":"https://creativecommons.org/publicdomain/zero/1.0/"}"""
+        )
+        val unsafeNames = listOf(
+            "../outside.mp3",
+            "folder/../../outside.mp3",
+            "/absolute.mp3",
+            "folder//recording.mp3",
+            "folder\\\\recording.mp3",
+            "folder/./recording.mp3"
+        )
+
+        unsafeNames.forEach { name ->
+            assertNull(
+                "Expected unsafe path to be rejected: $name",
+                InternetArchiveTrackMapper.toWaveTrack(
+                    "safe-item",
+                    metadata,
+                    JSONArray().put(JSONObject().put("name", name))
+                )
+            )
+        }
+
+        assertNull(
+            InternetArchiveTrackMapper.toWaveTrack(
+                "../outside-item",
+                metadata,
+                JSONArray().put(JSONObject().put("name", "recording.mp3"))
+            )
+        )
+    }
 }

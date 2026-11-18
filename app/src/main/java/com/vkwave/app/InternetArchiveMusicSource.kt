@@ -153,7 +153,7 @@ internal object InternetArchiveTrackMapper {
         files: JSONArray,
         baseUrl: String = "https://archive.org"
     ): WaveTrack? {
-        if (identifier.isBlank() || !isAllowedLicense(metadata.optString("licenseurl"))) return null
+        if (!isSafePathSegment(identifier) || !isAllowedLicense(metadata.optString("licenseurl"))) return null
 
         val title = metadata.optString("title")
             .takeIf { it.isNotBlank() && it != "null" } ?: return null
@@ -174,7 +174,9 @@ internal object InternetArchiveTrackMapper {
             ?: return null
 
         val fileName = playableFile.second
-        val encodedFileName = fileName.split('/').joinToString("/") {
+        val pathSegments = fileName.split('/')
+        if (pathSegments.any { !isSafePathSegment(it) }) return null
+        val encodedFileName = pathSegments.joinToString("/") {
             URLEncoder.encode(it, Charsets.UTF_8.name()).replace("+", "%20")
         }
         val encodedIdentifier = URLEncoder.encode(identifier, Charsets.UTF_8.name()).replace("+", "%20")
@@ -190,6 +192,12 @@ internal object InternetArchiveTrackMapper {
             providerTrackId = "$identifier/$fileName"
         )
     }
+
+    private fun isSafePathSegment(value: String): Boolean =
+        value.isNotEmpty() &&
+            value != "." &&
+            value != ".." &&
+            value.none { it == '\\' || it.code < 0x20 || it.code == 0x7f }
 
     private fun isAllowedLicense(value: String): Boolean {
         val normalized = value.lowercase()
