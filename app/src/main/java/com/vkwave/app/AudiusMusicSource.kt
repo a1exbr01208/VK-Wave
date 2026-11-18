@@ -52,7 +52,7 @@ class AudiusMusicSource(
             val tracks = buildList {
                 for (index in 0 until data.length()) {
                     val item = data.optJSONObject(index) ?: continue
-                    val track = AudiusTrackMapper.toWaveTrack(item) ?: continue
+                    val track = AudiusTrackMapper.toWaveTrack(item, apiBaseUrl) ?: continue
                     add(track)
                 }
             }
@@ -101,7 +101,10 @@ class AudiusMusicSource(
 
 /** Pure Audius response mapping, isolated for deterministic API contract tests. */
 internal object AudiusTrackMapper {
-    fun toWaveTrack(item: JSONObject): WaveTrack? {
+    fun toWaveTrack(
+        item: JSONObject,
+        apiBaseUrl: String = "https://api.audius.co/v1"
+    ): WaveTrack? {
         val trackId = item.optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return null
         val title = item.optString("title").takeIf { it.isNotBlank() && it != "null" } ?: return null
         val user = item.optJSONObject("user")
@@ -122,7 +125,7 @@ internal object AudiusTrackMapper {
             title = title,
             artist = artist,
             artworkUri = artworkUrl,
-            streamUri = "https://api.audius.co/v1/tracks/$trackId/stream",
+            streamUri = "${apiBaseUrl.trimEnd('/')}/tracks/$trackId/stream",
             sourceId = "audius",
             providerTrackId = trackId
         )
