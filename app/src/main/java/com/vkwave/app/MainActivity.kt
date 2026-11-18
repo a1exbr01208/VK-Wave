@@ -685,97 +685,103 @@ private fun SourceSearchScreen(
         }
     }
 
-    Column(
-        modifier.verticalScroll(rememberScrollState()),
+    LazyColumn(
+        modifier,
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("Один запрос по всем подключённым каталогам", color = Muted, fontSize = 12.sp)
-        OutlinedTextField(
-            value = query,
-            onValueChange = { value ->
-                if (value != query) {
-                    query = value
-                    searchGeneration += 1
-                    searchJob?.cancel()
-                    paginationJob?.cancel()
-                    loading = false
-                    hasSearched = false
-                    groups = emptyList()
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Трек или исполнитель") },
-            singleLine = true
-        )
-        Button(
-            onClick = {
-                val searchQuery = query.trim()
-                if (searchQuery.isNotEmpty()) {
-                    searchGeneration += 1
-                    val generation = searchGeneration
-                    searchJob?.cancel()
-                    paginationJob?.cancel()
-                    resultQuery = searchQuery
-                    groups = emptyList()
-                    searchJob = scope.launch {
-                        loading = true
-                        hasSearched = true
-                        try {
-                            val results = coroutineScope {
-                                sources.map { descriptor ->
-                                    async {
-                                        val provider = sourceRegistry.get(descriptor.id)
-                                            ?: return@async SourceSearchGroup(descriptor, message = "Источник отключён")
-                                        try {
-                                            when (val state = provider.connectionState()) {
-                                                SourceConnectionState.Available -> {
-                                                    val page = provider.search(searchQuery)
-                                                    SourceSearchGroup(
-                                                        descriptor,
-                                                        page.tracks,
-                                                        nextPageToken = page.nextPageToken
-                                                    )
-                                                }
-                                                SourceConnectionState.NeedsPermission ->
-                                                    SourceSearchGroup(descriptor, message = "Нужно разрешение Android")
-                                                SourceConnectionState.NeedsAuthentication ->
-                                                    SourceSearchGroup(descriptor, message = "Требуется авторизация")
-                                                is SourceConnectionState.NeedsConfiguration ->
-                                                    SourceSearchGroup(descriptor, message = state.reason)
-                                                is SourceConnectionState.Unavailable ->
-                                                    SourceSearchGroup(descriptor, message = state.reason)
-                                            }
-                                        } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                                            throw cancelled
-                                        } catch (error: Exception) {
-                                            SourceSearchGroup(descriptor, message = error.message ?: "Ошибка поиска")
-                                        }
-                                    }
-                                }.awaitAll()
-                            }
-                            if (generation == searchGeneration) groups = results
-                        } finally {
-                            if (generation == searchGeneration) loading = false
+        item(key = "search-title") {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text("Поиск музыки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Text("Один запрос по всем подключённым каталогам", color = Muted, fontSize = 12.sp)
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { value ->
+                        if (value != query) {
+                            query = value
+                            searchGeneration += 1
+                            searchJob?.cancel()
+                            paginationJob?.cancel()
+                            loading = false
+                            hasSearched = false
+                            groups = emptyList()
                         }
-                    }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Трек или исполнитель") },
+                    singleLine = true
+                )
+                Button(
+                    onClick = {
+                        val searchQuery = query.trim()
+                        if (searchQuery.isNotEmpty()) {
+                            searchGeneration += 1
+                            val generation = searchGeneration
+                            searchJob?.cancel()
+                            paginationJob?.cancel()
+                            resultQuery = searchQuery
+                            groups = emptyList()
+                            searchJob = scope.launch {
+                                loading = true
+                                hasSearched = true
+                                try {
+                                    val results = coroutineScope {
+                                        sources.map { descriptor ->
+                                            async {
+                                                val provider = sourceRegistry.get(descriptor.id)
+                                                    ?: return@async SourceSearchGroup(descriptor, message = "Источник отключён")
+                                                try {
+                                                    when (val state = provider.connectionState()) {
+                                                        SourceConnectionState.Available -> {
+                                                            val page = provider.search(searchQuery)
+                                                            SourceSearchGroup(
+                                                                descriptor,
+                                                                page.tracks,
+                                                                nextPageToken = page.nextPageToken
+                                                            )
+                                                        }
+                                                        SourceConnectionState.NeedsPermission ->
+                                                            SourceSearchGroup(descriptor, message = "Нужно разрешение Android")
+                                                        SourceConnectionState.NeedsAuthentication ->
+                                                            SourceSearchGroup(descriptor, message = "Требуется авторизация")
+                                                        is SourceConnectionState.NeedsConfiguration ->
+                                                            SourceSearchGroup(descriptor, message = state.reason)
+                                                        is SourceConnectionState.Unavailable ->
+                                                            SourceSearchGroup(descriptor, message = state.reason)
+                                                    }
+                                                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                                                    throw cancelled
+                                                } catch (error: Exception) {
+                                                    SourceSearchGroup(descriptor, message = error.message ?: "Ошибка поиска")
+                                                }
+                                            }
+                                        }.awaitAll()
+                                    }
+                                    if (generation == searchGeneration) groups = results
+                                } finally {
+                                    if (generation == searchGeneration) loading = false
+                                }
+                            }
+                        }
+                    },
+                    enabled = !loading && !loadingMore && query.isNotBlank() && sources.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (loading) "Ищем во всех каталогах…" else "Искать везде")
                 }
-            },
-            enabled = !loading && !loadingMore && query.isNotBlank() && sources.isNotEmpty(),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(if (loading) "Ищем во всех каталогах…" else "Искать везде")
+                if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+                if (groups.isNotEmpty() && query.trim() != resultQuery) {
+                    Text("Результаты для «$resultQuery». Нажми «Искать везде», чтобы обновить.", color = Muted, fontSize = 11.sp)
+                }
+                if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
+                    Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
+                }
+            }
         }
 
-        if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
-        if (groups.isNotEmpty() && query.trim() != resultQuery) {
-            Text("Результаты для «$resultQuery». Нажми «Искать везде», чтобы обновить.", color = Muted, fontSize = 11.sp)
-        }
-        if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
-            Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
-        }
-
-        groups.forEach { group ->
+        itemsIndexed(
+            items = groups,
+            key = { _, group -> "source:${group.source.id}" }
+        ) { _, group ->
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -820,7 +826,6 @@ private fun SourceSearchScreen(
         }
     }
 }
-
 @Composable
 private fun QueueScreen(
     controller: MediaController?,
