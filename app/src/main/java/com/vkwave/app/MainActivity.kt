@@ -43,6 +43,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+internal fun resolveQueueStartIndex(
+    resolvedOriginalIndexes: List<Int>,
+    requestedIndex: Int
+): Int? {
+    val requested = requestedIndex.coerceAtLeast(0)
+    return resolvedOriginalIndexes.indexOfFirst { it >= requested }.takeIf { it >= 0 }
+}
+
 private val Ink = Color(0xFF101116)
 private val Panel = Color(0xFF1B1D25)
 private val Accent = Color(0xFF9B7BFF)
@@ -121,9 +129,10 @@ class MainActivity : ComponentActivity() {
             if (resolved.isNotEmpty() && mediaControllerState.value === controller) {
                 // If the requested track could not be resolved, start at the next
                 // playable result rather than accidentally shifting to an earlier track.
-                val requestedIndex = startIndex.coerceAtLeast(0)
-                val resolvedStart = resolved.indexOfFirst { it.first >= requestedIndex }
-                    .takeIf { it >= 0 } ?: 0
+                val resolvedStart = resolveQueueStartIndex(
+                    resolved.map { it.first },
+                    startIndex
+                ) ?: return@launch
                 controller.setMediaItems(resolved.map { it.second }, resolvedStart, 0L)
                 controller.prepare()
                 controller.play()
