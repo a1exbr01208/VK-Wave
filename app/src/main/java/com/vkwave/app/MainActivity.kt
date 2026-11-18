@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     private val musicSources by lazy { createMusicSourceRegistry(applicationContext) }
     private var controllerFuture: Future<MediaController>? = null
     private var saveCrossfadeJob: Job? = null
+    private var resolvePlaybackJob: Job? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,13 +104,27 @@ class MainActivity : ComponentActivity() {
 
     private fun playSourceTracks(tracks: List<WaveTrack>, startIndex: Int) {
         val controller = mediaControllerState.value ?: return
-        lifecycleScope.launch {
-            val items = tracks.mapNotNull { track ->
-                val source = musicSources.get(track.sourceId) ?: return@mapNotNull null
-                runCatching { track to source.resolvePlayback(track) }.getOrNull()
-            }.map { (track, uri) -> track.toMediaItem(uri) }
-            if (items.isNotEmpty() && mediaControllerState.value === controller) {
-                controller.setMediaItems(items, startIndex.coerceIn(items.indices), 0L)
+        resolvePlaybackJob?.cancel()
+        resolvePlaybackJob = lifecycleScope.launch {
+            val resolved = tracks.mapIndexedNotNull { originalIndex, track ->
+                val source = musicSources.get(track.sourceId) ?: return@mapIndexedNotNull null
+                val uri = try {
+                    source.resolvePlayback(track)
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    null
+                } ?: return@mapIndexedNotNull null
+                originalIndex to track.toMediaItem(uri)
+            }
+
+            if (resolved.isNotEmpty() && mediaControllerState.value === controller) {
+                // If the requested track could not be resolved, start at the next
+                // playable result rather than accidentally shifting to an earlier track.
+                val requestedIndex = startIndex.coerceAtLeast(0)
+                val resolvedStart = resolved.indexOfFirst { it.first >= requestedIndex }
+                    .takeIf { it >= 0 } ?: 0
+                controller.setMediaItems(resolved.map { it.second }, resolvedStart, 0L)
                 controller.prepare()
                 controller.play()
             }
@@ -142,6 +157,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
+        resolvePlaybackJob?.cancel()
+        resolvePlaybackJob = null
         mediaControllerState.value = null
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
