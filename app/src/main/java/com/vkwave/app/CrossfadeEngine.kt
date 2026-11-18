@@ -212,8 +212,23 @@ class CrossfadeEngine(context: Context) {
     }
 
     fun seekTo(positionMs: Long) {
-        if (!released && activePlayer.mediaItemCount > 0) {
-            activePlayer.seekTo(positionMs.coerceAtLeast(0L))
+        if (released || activePlayer.mediaItemCount == 0) return
+        val interruptedTransition = transitionJob?.isActive == true
+        if (interruptedTransition) {
+            queueGeneration += 1
+            transitionJob?.cancel()
+            transitionJob = null
+            val standby = players[1 - active]
+            standby.stop()
+            standby.clearMediaItems()
+            outgoingGain = 1f
+            incomingGain = 0f
+            applyVolumes()
+        }
+        activePlayer.seekTo(positionMs.coerceAtLeast(0L))
+        if (interruptedTransition) {
+            prepareUpcoming()
+            startMonitor()
         }
     }
 

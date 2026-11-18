@@ -136,7 +136,10 @@ internal object AudiusTrackMapper {
 
 
 private fun isSafeAudiusTrackId(value: String): Boolean =
-    value.isNotBlank() && value.all { it.isLetterOrDigit() || it == '-' || it == '_' }
+    value.isNotBlank() && value != "null" &&
+        value.all {
+            it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_'
+        }
 
 internal fun audiusStreamUrl(apiBaseUrl: String, trackId: String): String {
     require(isSafeAudiusTrackId(trackId)) { "Invalid Audius track ID" }

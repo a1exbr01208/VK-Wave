@@ -104,6 +104,15 @@ class AudiusTrackMapperTest {
     }
 
     @Test
+    fun rejectsNullLiteralAndNonAsciiTrackIds() {
+        listOf("null", "трек-123").forEach { id ->
+            assertNull(AudiusTrackMapper.toWaveTrack(
+                JSONObject(mapOf("id" to id, "title" to "Invalid"))
+            ))
+        }
+    }
+
+    @Test
     fun ignoresInvalidArtworkAndUsesFallbackArtist() {
         val json = JSONObject(
             """{"id":"track-789","title":"Untitled","user":{},"artwork":{"480x480":"javascript:bad"}}"""
