@@ -376,6 +376,12 @@ private fun SettingsScreen(
     var jamendoMessage by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
+    LaunchedEffect(jamendo) {
+        context.savedJamendoClientId.collect { saved ->
+            jamendoClientId = saved ?: jamendo?.configuredClientId.orEmpty()
+        }
+    }
+
     suspend fun refreshStatuses() {
         refreshing = true
         try {
