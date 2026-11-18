@@ -23,6 +23,7 @@ gradle --no-daemon testDebugUnitTest assembleDebug
 - Live playback progress, elapsed/duration display and seeking
 - On-demand synthetic two-tone test queue for exercising playback without external credentials
 - Foreground MediaSession service with lifecycle-managed MediaController
+- Local wake lock while audio is actively playing with the screen off
 - Two ExoPlayer decks with stable MediaSession player adapters
 - Service-coordinated audio focus and headphone-unplug handling
 - Equal-power cosine/sine crossfade, configurable from 2 to 15 seconds (default 7)

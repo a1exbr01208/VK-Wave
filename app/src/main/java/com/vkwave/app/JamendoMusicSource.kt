@@ -93,8 +93,7 @@ class JamendoMusicSource(
         }
         return Uri.parse(
             directStream ?: (
-                "$apiBaseUrl/tracks/file/?client_id=${encode(clientId)}" +
-                    "&id=${encode(track.providerTrackId)}&action=stream&audioformat=mp32"
+                jamendoStreamUrl(apiBaseUrl, clientId, track.providerTrackId)
                 )
         )
     }
@@ -157,4 +156,12 @@ internal object JamendoTrackMapper {
             providerTrackId = trackId
         )
     }
+}
+
+
+internal fun jamendoStreamUrl(apiBaseUrl: String, clientId: String, trackId: String): String {
+    val encodedClientId = URLEncoder.encode(clientId, Charsets.UTF_8.name())
+    val encodedTrackId = URLEncoder.encode(trackId, Charsets.UTF_8.name())
+    return "${apiBaseUrl.trimEnd('/')}/tracks/file/?client_id=$encodedClientId" +
+        "&id=$encodedTrackId&action=stream&audioformat=mp32"
 }

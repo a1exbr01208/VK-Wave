@@ -36,7 +36,10 @@ class CrossfadeEngine(context: Context) {
             .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
             .build()
         players = Array(2) {
-            ExoPlayer.Builder(appContext).build().apply {
+            ExoPlayer.Builder(appContext)
+                .setWakeMode(C.WAKE_MODE_LOCAL)
+                .build()
+                .apply {
                 setAudioAttributes(attributes, false)
                 setHandleAudioBecomingNoisy(true)
             }

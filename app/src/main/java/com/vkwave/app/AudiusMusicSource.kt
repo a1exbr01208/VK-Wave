@@ -66,7 +66,7 @@ class AudiusMusicSource(
         if (track.sourceId != SOURCE_ID || track.providerTrackId.isBlank()) {
             throw UnsupportedSourceTrackException("Track does not belong to Audius")
         }
-        return Uri.parse("$apiBaseUrl/tracks/${track.providerTrackId}/stream")
+        return Uri.parse(audiusStreamUrl(apiBaseUrl, track.providerTrackId))
     }
 
     private fun getJson(path: String): JSONObject {
@@ -132,3 +132,7 @@ internal object AudiusTrackMapper {
     }
 
 }
+
+
+internal fun audiusStreamUrl(apiBaseUrl: String, trackId: String): String =
+    "${apiBaseUrl.trimEnd('/')}/tracks/$trackId/stream"

@@ -27,6 +27,14 @@ class JamendoTrackMapperTest {
 
 
     @Test
+    fun buildsFallbackStreamUrlWithoutDuplicateSlash() {
+        assertEquals(
+            "https://api.example/v3.0/tracks/file/?client_id=public-id&id=42&action=stream&audioformat=mp32",
+            jamendoStreamUrl("https://api.example/v3.0/", "public-id", "42")
+        )
+    }
+
+    @Test
     fun mapsTrackMetadataAndArtwork() {
         val json = JSONObject(
             """

@@ -55,6 +55,14 @@ class AudiusTrackMapperTest {
     }
 
     @Test
+    fun buildsStreamUrlWithoutDuplicateSlashWhenApiBaseHasTrailingSlash() {
+        assertEquals(
+            "https://gateway.example/v1/tracks/track-1/stream",
+            audiusStreamUrl("https://gateway.example/v1/", "track-1")
+        )
+    }
+
+    @Test
     fun fallsBackToHandleAndSmallArtwork() {
         val json = JSONObject(
             """
