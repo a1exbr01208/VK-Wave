@@ -17,6 +17,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.flow.MutableStateFlow
+
+/** Live crossfade progress shared with the playback UI in this app process. */
+object WaveCrossfadeStatus {
+    val progress = MutableStateFlow<Float?>(null)
+}
 
 /**
  * Dual-player equal-power crossfade engine.
@@ -106,6 +112,7 @@ class CrossfadeEngine(context: Context) {
         queueGeneration += 1
         transitionJob?.cancel()
         transitionJob = null
+        WaveCrossfadeStatus.progress.value = null
         monitorJob?.cancel()
         unavailableQueueIndexes.clear()
         playlist = items.toList()
@@ -213,6 +220,7 @@ class CrossfadeEngine(context: Context) {
         transitionJob?.cancel()
         transitionJob = null
         monitorJob?.cancel()
+        WaveCrossfadeStatus.progress.value = null
         players.forEach { it.stop() }
         outgoingGain = 1f
         incomingGain = 0f
@@ -302,6 +310,7 @@ class CrossfadeEngine(context: Context) {
         queueGeneration += 1
         transitionJob?.cancel()
         transitionJob = null
+        WaveCrossfadeStatus.progress.value = null
         monitorJob?.cancel()
         unavailableQueueIndexes.remove(targetIndex)
 
@@ -487,6 +496,7 @@ class CrossfadeEngine(context: Context) {
 
                 incoming.volume = 0f
                 incoming.play()
+                WaveCrossfadeStatus.progress.value = 0f
                 val effectiveDurationMs = CrossfadeMath.capFadeToIncomingDuration(
                     durationMs,
                     incoming.duration
@@ -539,6 +549,7 @@ class CrossfadeEngine(context: Context) {
                     }
 
                     val progress = (step + 1f) / steps
+                    WaveCrossfadeStatus.progress.value = progress.coerceIn(0f, 1f)
                     outgoingGain = CrossfadeMath.outgoingGain(progress)
                     incomingGain = CrossfadeMath.incomingGain(progress)
                     applyVolumes()
@@ -560,6 +571,7 @@ class CrossfadeEngine(context: Context) {
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } finally {
+                WaveCrossfadeStatus.progress.value = null
                 if (!completed && !released && generation == queueGeneration) {
                     incoming.pause()
                     outgoingGain = 1f
@@ -583,6 +595,7 @@ class CrossfadeEngine(context: Context) {
     fun release() {
         if (released) return
         released = true
+        WaveCrossfadeStatus.progress.value = null
         queueGeneration += 1
         monitorJob?.cancel()
         transitionJob?.cancel()

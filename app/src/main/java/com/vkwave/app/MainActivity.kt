@@ -303,6 +303,7 @@ fun VKWaveApp(
     }
     var positionMs by remember(controller) { mutableLongStateOf(0L) }
     var durationMs by remember(controller) { mutableLongStateOf(0L) }
+    val crossfadeProgress by WaveCrossfadeStatus.progress.collectAsState()
 
     DisposableEffect(controller) {
         val listener = object : Player.Listener {
@@ -370,11 +371,11 @@ fun VKWaveApp(
                             onPlaySourceTracks
                         )
                         "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
-                        "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
+                        "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, crossfade, onCrossfadeChange, Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp))
                         "Плеер" -> PlayerCard(
                             Modifier.weight(1f).fillMaxWidth().padding(horizontal = 16.dp),
                             currentTitle to currentArtist, playing, hasMedia, canSkipPrevious, canSkipNext,
-                            positionMs, durationMs, controller != null,
+                            positionMs, durationMs, crossfadeProgress, controller != null,
                             { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                             { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
                             { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
@@ -398,7 +399,6 @@ fun VKWaveApp(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                         )
                     }
-                    CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                     NavigationBar(containerColor = Panel, contentColor = LocalWavePalette.current.foreground) {
                         waveTabs.forEach { item ->
                             NavigationBarItem(
@@ -440,10 +440,10 @@ fun VKWaveApp(
                             "Поиск" -> SourceSearchScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Медиатека" -> SourceLibraryScreen(sourceRegistry, Modifier.weight(1f).fillMaxWidth(), onPlaySourceTracks)
                             "Очередь" -> QueueScreen(controller, Modifier.weight(1f).fillMaxWidth())
-                            "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, Modifier.weight(1f).fillMaxWidth())
+                            "Профиль" -> SettingsScreen(sourceRegistry, selectedTheme, onThemeChange, crossfade, onCrossfadeChange, Modifier.weight(1f).fillMaxWidth())
                             "Плеер" -> PlayerCard(
                                 Modifier.weight(1f).fillMaxWidth(), currentTitle to currentArtist, playing, hasMedia,
-                                canSkipPrevious, canSkipNext, positionMs, durationMs, controller != null,
+                                canSkipPrevious, canSkipNext, positionMs, durationMs, crossfadeProgress, controller != null,
                                 { controller?.let { if (it.isPlaying) it.pause() else if (it.mediaItemCount > 0) it.play() } },
                                 { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)) it.seekToPreviousMediaItem() } },
                                 { controller?.let { if (it.isCommandAvailable(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)) it.seekToNextMediaItem() } },
@@ -463,7 +463,6 @@ fun VKWaveApp(
                                 onPlay = { controller?.let { if (it.isPlaying) it.pause() else it.play() } },
                                 modifier = Modifier.padding(top = 12.dp))
                         }
-                        CrossfadeCard(crossfade, onCrossfadeChange, Modifier.padding(top = 10.dp))
                     }
                 }
             }
@@ -499,6 +498,8 @@ private fun SettingsScreen(
     sourceRegistry: MusicSourceRegistry,
     selectedTheme: String,
     onThemeChange: (String) -> Unit,
+    crossfade: Float,
+    onCrossfadeChange: (Float) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var statuses by remember { mutableStateOf(emptyMap<String, String>()) }
@@ -535,7 +536,20 @@ private fun SettingsScreen(
         modifier.verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        Text("Настройки", color = LocalWavePalette.current.foreground, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+        Surface(color = Panel, shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                WaveLogo()
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("WAVE PLAYER", color = LocalWavePalette.current.foreground,
+                        fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                    Text("Профиль и настройки", color = Muted, fontSize = 12.sp)
+                    Text("Музыка без лишнего шума", color = Muted, fontSize = 11.sp)
+                }
+                Icon(Icons.Default.Equalizer, contentDescription = null, tint = Accent,
+                    modifier = Modifier.size(28.dp))
+            }
+        }
         Text("Оформление приложения", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Surface(color = Panel, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -562,6 +576,8 @@ private fun SettingsScreen(
                 Text("Выбор сохраняется автоматически", color = Muted, fontSize = 11.sp)
             }
         }
+        Text("Воспроизведение", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+        CrossfadeCard(crossfade, onCrossfadeChange)
         Text("Подключённые музыкальные источники", color = LocalWavePalette.current.foreground, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
         Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1277,6 +1293,7 @@ private fun PlayerCard(
     canSkipNext: Boolean,
     positionMs: Long,
     durationMs: Long,
+    crossfadeProgress: Float?,
     canRunDemo: Boolean,
     onPlay: () -> Unit,
     onPrevious: () -> Unit,
@@ -1308,8 +1325,26 @@ private fun PlayerCard(
                 Icon(Icons.Default.GraphicEq, contentDescription = "Обложка демо-трека",
                     tint = Color.White.copy(alpha = .9f), modifier = Modifier.size(76.dp))
             }
-            Spacer(Modifier.height(22.dp))
-            Text(track.first, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            if (crossfadeProgress != null) {
+                Spacer(Modifier.height(14.dp))
+                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("СМЕШИВАНИЕ ТРЕКОВ", color = LocalWavePalette.current.foreground,
+                            fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("${(crossfadeProgress * 100).toInt()}%", color = Accent,
+                            fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                    LinearProgressIndicator(
+                        progress = crossfadeProgress.coerceIn(0f, 1f),
+                        modifier = Modifier.fillMaxWidth().height(5.dp).clip(CircleShape),
+                        color = Accent,
+                        trackColor = Muted.copy(alpha = .25f)
+                    )
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(track.first, fontSize = 24.sp, fontWeight = FontWeight.Bold, color = LocalWavePalette.current.foreground)
             Text(track.second, color = Muted, fontSize = 15.sp)
             Spacer(Modifier.height(12.dp))
             Slider(
@@ -1333,7 +1368,7 @@ private fun PlayerCard(
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onPrevious, enabled = canSkipPrevious) {
-                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (canSkipPrevious) Color.White else Muted)
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Предыдущий трек", tint = if (canSkipPrevious) LocalWavePalette.current.foreground else Muted)
                 }
                 FilledIconButton(onClick = onPlay, enabled = hasMedia,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Accent),
@@ -1343,12 +1378,12 @@ private fun PlayerCard(
                         modifier = Modifier.size(30.dp))
                 }
                 IconButton(onClick = onNext, enabled = canSkipNext) {
-                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (canSkipNext) Color.White else Muted)
+                    Icon(Icons.Default.SkipNext, contentDescription = "Следующий трек", tint = if (canSkipNext) LocalWavePalette.current.foreground else Muted)
                 }
             }
             Spacer(Modifier.height(12.dp))
             Text(if (hasMedia) "УПРАВЛЕНИЕ ЧЕРЕЗ ANDROID MEDIA SESSION" else "НЕТ ДОСТУПНОГО ИСТОЧНИКА АУДИО",
-                color = Color.White.copy(alpha = .6f), fontSize = 9.sp, letterSpacing = 1.sp)
+                color = Muted, fontSize = 9.sp, letterSpacing = 1.sp)
             TextButton(onClick = onDemoPlayback, enabled = canRunDemo) {
                 Icon(Icons.Default.GraphicEq, contentDescription = null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(6.dp))
