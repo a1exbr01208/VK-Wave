@@ -133,6 +133,7 @@ class CrossfadeSessionPlayer(
         when (seekCommand) {
             Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM -> engine.skipToNext()
             Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> engine.skipToPrevious()
+            Player.COMMAND_SEEK_TO_MEDIA_ITEM -> engine.seekToQueueItem(mediaItemIndex, positionMs)
             Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM -> engine.seekTo(positionMs)
             else -> return super.handleSeek(mediaItemIndex, positionMs, seekCommand)
         }
