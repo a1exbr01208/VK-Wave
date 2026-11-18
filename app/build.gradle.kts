@@ -7,13 +7,20 @@ android {
     namespace = "com.vkwave.app"
     compileSdk = 35
     defaultConfig {
+        val localProperties = java.util.Properties().apply {
+            val propertiesFile = rootProject.file("local.properties")
+            if (propertiesFile.exists()) propertiesFile.inputStream().use { load(it) }
+        }
+        val jamendoClientId = localProperties.getProperty("JAMENDO_CLIENT_ID", "")
+            .replace("\\", "\\\\").replace("\"", "\\\"")
+        buildConfigField("String", "JAMENDO_CLIENT_ID", "\"$jamendoClientId\"")
         applicationId = "com.vkwave.app"
         minSdk = 26
         targetSdk = 35
         versionCode = 1
         versionName = "0.1.0"
     }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
