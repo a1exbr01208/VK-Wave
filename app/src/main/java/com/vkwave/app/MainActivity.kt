@@ -365,6 +365,14 @@ private fun SettingsScreen(
 ) {
     var statuses by remember { mutableStateOf(emptyMap<String, String>()) }
     var refreshing by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val jamendo = remember(sourceRegistry) {
+        sourceRegistry.get(JamendoMusicSource.SOURCE_ID) as? JamendoMusicSource
+    }
+    var jamendoClientId by remember(jamendo) {
+        mutableStateOf(jamendo?.configuredClientId.orEmpty())
+    }
+    var savingJamendo by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     suspend fun refreshStatuses() {
@@ -384,6 +392,43 @@ private fun SettingsScreen(
     ) {
         Text("Настройки", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
         Text("Подключённые музыкальные источники", color = Muted, fontSize = 13.sp)
+        Surface(color = Panel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Jamendo", color = Color.White, fontWeight = FontWeight.SemiBold)
+                Text(
+                    "Необязательный публичный Client ID из Jamendo Developer Portal. Он нужен только для поиска и потока Jamendo.",
+                    color = Muted,
+                    fontSize = 12.sp
+                )
+                OutlinedTextField(
+                    value = jamendoClientId,
+                    onValueChange = { jamendoClientId = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Jamendo Client ID") }
+                )
+                Button(
+                    onClick = {
+                        scope.launch {
+                            savingJamendo = true
+                            jamendo?.setClientId(jamendoClientId)
+                            context.persistJamendoClientId(jamendoClientId)
+                            statuses = loadSourceStatusLabels(sourceRegistry)
+                            savingJamendo = false
+                        }
+                    },
+                    enabled = !savingJamendo && jamendo != null,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (savingJamendo) "Сохраняем…" else "Сохранить Client ID")
+                }
+                Text(
+                    "Получить ID: devportal.jamendo.com",
+                    color = Muted,
+                    fontSize = 11.sp
+                )
+            }
+        }
         OutlinedButton(
             onClick = { scope.launch { refreshStatuses() } },
             enabled = !refreshing,
