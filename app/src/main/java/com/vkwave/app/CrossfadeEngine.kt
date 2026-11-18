@@ -231,7 +231,10 @@ class CrossfadeEngine(context: Context) {
         return jumpTo(previousIndex)
     }
 
-    private fun jumpTo(targetIndex: Int): Boolean {
+    fun seekToQueueItem(targetIndex: Int, positionMs: Long = 0L): Boolean =
+        jumpTo(targetIndex, positionMs)
+
+    private fun jumpTo(targetIndex: Int, positionMs: Long = 0L): Boolean {
         if (targetIndex !in playlist.indices) return false
         val wasPlaying = activePlayer.playWhenReady
         queueGeneration += 1
@@ -250,7 +253,7 @@ class CrossfadeEngine(context: Context) {
         outgoingGain = 1f
         incomingGain = 0f
         current.volume = masterVolume
-        current.setMediaItem(playlist[index])
+        current.setMediaItem(playlist[index], positionMs.coerceAtLeast(0L))
         current.prepare()
         applyRepeatMode(current)
         if (wasPlaying) current.play()
