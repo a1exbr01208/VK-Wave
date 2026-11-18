@@ -52,7 +52,9 @@ private data class WaveTab(val title: String, val icon: ImageVector)
 private data class SourceSearchGroup(
     val source: SourceDescriptor,
     val tracks: List<WaveTrack> = emptyList(),
-    val message: String? = null
+    val message: String? = null,
+    val nextPageToken: String? = null,
+    val loadingMore: Boolean = false
 )
 private val waveTabs = listOf(
     WaveTab("Главная", Icons.Default.Home),
@@ -366,14 +368,7 @@ private fun SourceLibraryScreen(
                 Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(track.title, color = Color.White, fontWeight = FontWeight.SemiBold)
                     Text(track.artist, color = Muted, fontSize = 12.sp)
-                    Text("▶  Слушать", color = Accent, fontSize = 11.sp)
-                }
-            }
-        }
-    }
-}
-
-@Composable
+                    Text("▶  Слушать", color = @Composable
 private fun SourceSearchScreen(
     sourceRegistry: MusicSourceRegistry,
     modifier: Modifier = Modifier,
@@ -387,6 +382,44 @@ private fun SourceSearchScreen(
     var loading by remember { mutableStateOf(false) }
     var hasSearched by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val loadingMore = groups.any { it.loadingMore }
+
+    fun loadNextPage(group: SourceSearchGroup) {
+        val token = group.nextPageToken ?: return
+        if (loading || group.loadingMore) return
+        val searchQuery = query.trim()
+        if (searchQuery.isEmpty()) return
+        groups = groups.map {
+            if (it.source.id == group.source.id) it.copy(loadingMore = true, message = null) else it
+        }
+        scope.launch {
+            val provider = sourceRegistry.get(group.source.id)
+            try {
+                if (provider == null) {
+                    throw IllegalStateException("Источник отключён")
+                }
+                val page = provider.search(searchQuery, token)
+                groups = groups.map { current ->
+                    if (current.source.id != group.source.id) current
+                    else current.copy(
+                        tracks = (current.tracks + page.tracks).distinctBy { it.id },
+                        nextPageToken = page.nextPageToken,
+                        loadingMore = false,
+                        message = if (page.tracks.isEmpty()) "Больше результатов нет" else null
+                    )
+                }
+            } catch (error: Exception) {
+                groups = groups.map { current ->
+                    if (current.source.id == group.source.id) {
+                        current.copy(
+                            loadingMore = false,
+                            message = error.message ?: "Не удалось загрузить следующую страницу"
+                        )
+                    } else current
+                }
+            }
+        }
+    }
 
     Column(
         modifier.verticalScroll(rememberScrollState()),
@@ -421,7 +454,11 @@ private fun SourceSearchScreen(
                                             when (val state = provider.connectionState()) {
                                                 SourceConnectionState.Available -> {
                                                     val page = provider.search(searchQuery)
-                                                    SourceSearchGroup(descriptor, page.tracks)
+                                                    SourceSearchGroup(
+                                                        descriptor,
+                                                        page.tracks,
+                                                        nextPageToken = page.nextPageToken
+                                                    )
                                                 }
                                                 SourceConnectionState.NeedsPermission ->
                                                     SourceSearchGroup(descriptor, message = "Нужно разрешение Android")
@@ -447,7 +484,7 @@ private fun SourceSearchScreen(
                     }
                 }
             },
-            enabled = !loading && query.isNotBlank() && sources.isNotEmpty(),
+            enabled = !loading && !loadingMore && query.isNotBlank() && sources.isNotEmpty(),
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(if (loading) "Ищем во всех каталогах…" else "Искать везде")
@@ -494,6 +531,22 @@ private fun SourceSearchScreen(
                             }
                             Icon(Icons.Default.PlayArrow, contentDescription = "Слушать", tint = Accent)
                         }
+                    }
+                }
+                if (group.nextPageToken != null || group.loadingMore) {
+                    OutlinedButton(
+                        onClick = { loadNextPage(group) },
+                        enabled = !loading && !group.loadingMore && !loadingMore,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (group.loadingMore) "Загружаем…" else "Ещё результаты")
+                    }
+                }
+            }
+        }
+    }
+}
+   }
                     }
                 }
             }
