@@ -96,6 +96,24 @@ class PlaybackQueueTest {
     }
 
     @Test
+    fun repeatAllKeepsSingleItemQueueOnTheSameTrack() {
+        val queue = PlaybackQueue().apply {
+            replace(listOf(first))
+            repeatMode = QueueRepeatMode.ALL
+        }
+        assertEquals(first, queue.next())
+        assertEquals(0, queue.currentIndex)
+    }
+
+    @Test
+    fun allUnavailableFollowingItemsProduceNoAutomaticCandidate() {
+        assertEquals(
+            emptyList<Int>(),
+            nextPlayableQueueIndexes(4, 0, QueueRepeatMode.ALL, setOf(1, 2, 3))
+        )
+    }
+
+    @Test
     fun repeatOneKeepsCurrentTrack() {
         val queue = PlaybackQueue().apply {
             replace(listOf(first, second))
