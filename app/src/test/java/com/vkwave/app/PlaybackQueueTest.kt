@@ -15,8 +15,8 @@ class PlaybackQueueTest {
     }
 
     @Test
-    fun resolvedStartIndexReturnsNullWhenNoRequestedOrLaterTrackSurvives() {
-        assertNull(resolveQueueStartIndex(listOf(0, 1), requestedIndex = 2))
+    fun resolvedStartIndexFallsBackToLastEarlierPlayableTrack() {
+        assertEquals(1, resolveQueueStartIndex(listOf(0, 1), requestedIndex = 2))
     }
 
     @Test
