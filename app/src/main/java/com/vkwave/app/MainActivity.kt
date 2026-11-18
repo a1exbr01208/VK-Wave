@@ -505,6 +505,8 @@ private fun SourceLibraryScreen(
             try {
                 tracks = provider.library().tracks
                 message = if (tracks.isEmpty()) "На устройстве пока не найдено музыкальных файлов" else "Найдено файлов: ${tracks.size}"
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
             } catch (error: Exception) {
                 message = error.message ?: "Не удалось прочитать медиатеку"
             } finally {
@@ -697,6 +699,9 @@ private fun SourceSearchScreen(
         }
 
         if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+        if (groups.isNotEmpty() && query.trim() != resultQuery) {
+            Text("Результаты для «$resultQuery». Нажми «Искать везде», чтобы обновить.", color = Muted, fontSize = 11.sp)
+        }
         if (hasSearched && !loading && groups.all { it.tracks.isEmpty() }) {
             Text("Ничего не найдено в доступных источниках", color = Muted, fontSize = 13.sp)
         }
@@ -736,7 +741,7 @@ private fun SourceSearchScreen(
                 if (group.nextPageToken != null || group.loadingMore) {
                     OutlinedButton(
                         onClick = { loadNextPage(group) },
-                        enabled = !loading && !group.loadingMore && !loadingMore,
+                        enabled = !loading && !group.loadingMore && !loadingMore && query.trim() == resultQuery,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(if (group.loadingMore) "Загружаем…" else "Ещё результаты")
