@@ -53,7 +53,11 @@ class CrossfadeSessionPlayer(
             commands.remove(Player.COMMAND_SEEK_IN_CURRENT_MEDIA_ITEM)
         }
 
-        val currentDurationMs = engine.activePlayer.duration
+        val currentItem = queue.getOrNull(engine.currentQueueIndex)
+        val metadataDurationMs = currentItem?.mediaMetadata?.extras
+            ?.getLong(WAVE_DURATION_EXTRA, 0L) ?: 0L
+        val currentDurationMs = engine.activePlayer.duration.takeIf { it > 0L }
+            ?: metadataDurationMs
         val playlist = queue.mapIndexed { index, mediaItem ->
             val itemBuilder = SimpleBasePlayer.MediaItemData.Builder("$index:${mediaItem.mediaId}")
                 .setMediaItem(mediaItem)
