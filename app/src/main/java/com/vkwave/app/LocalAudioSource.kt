@@ -63,7 +63,8 @@ class LocalAudioSource(context: Context) : MusicSource {
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.TITLE,
             MediaStore.Audio.Media.ARTIST,
-            MediaStore.Audio.Media.ALBUM_ID
+            MediaStore.Audio.Media.ALBUM_ID,
+            MediaStore.Audio.Media.DURATION
         )
         val result = mutableListOf<WaveTrack>()
         appContext.contentResolver.query(
@@ -77,6 +78,7 @@ class LocalAudioSource(context: Context) : MusicSource {
             val titleColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.TITLE)
             val artistColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ARTIST)
             val albumColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.ALBUM_ID)
+            val durationColumn = cursor.getColumnIndexOrThrow(MediaStore.Audio.Media.DURATION)
             while (cursor.moveToNext()) {
                 val mediaId = cursor.getLong(idColumn)
                 val title = cursor.getString(titleColumn)?.takeIf { it.isNotBlank() } ?: "Без названия"
@@ -94,7 +96,8 @@ class LocalAudioSource(context: Context) : MusicSource {
                     artworkUri = artworkUri,
                     streamUri = contentUri.toString(),
                     sourceId = SOURCE_ID,
-                    providerTrackId = mediaId.toString()
+                    providerTrackId = mediaId.toString(),
+                    durationMs = cursor.getLong(durationColumn).takeIf { it > 0L }
                 )
             }
         }
