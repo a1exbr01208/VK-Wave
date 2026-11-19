@@ -335,7 +335,10 @@ fun VKWaveApp(
         } else {
             while (isActive) {
                 positionMs = controller.currentPosition.coerceAtLeast(0L)
-                durationMs = controller.duration.takeIf { it > 0L } ?: 0L
+                val metadataDurationMs = controller.currentMediaItem
+                    ?.mediaMetadata?.extras?.getLong(WAVE_DURATION_EXTRA, 0L) ?: 0L
+                durationMs = controller.duration.takeIf { it > 0L }
+                    ?: metadataDurationMs
                 delay(500)
             }
         }
